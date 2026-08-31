@@ -1,0 +1,8 @@
+
+Confirmation Code:	FJASCG
+ 
+Date	Departs	Arrives	Flt #	Route	Passengers	Seat	Terminal
+Thu, Jul 10	4:05 PM	8:15 PM	GF 44	IST To BAH	Mr Guest  Guest	 	 
+Thu, Jul 10	11:30 PM	12:20 PM	GF 165	BAH To SIN	Mr Guest  Guest	 	 
+ 
+
