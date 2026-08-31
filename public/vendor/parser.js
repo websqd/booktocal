@@ -266,6 +266,8 @@ function mkEvent(partial) {
     type: partial.type || 'event',
     title: partial.title || 'Event',
     location: partial.location || '',
+    tz: partial.tz || null,
+    tzEnd: partial.tzEnd || null,
     allDay: !!partial.allDay,
     start: partial.start,
     end: partial.end || null,
@@ -290,6 +292,131 @@ function clampInt(v, min, max, fallback) {
 
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// --- timezone detection --------------------------------------------------------
+// Events carry the venue timezone (hotel country, departure/arrival airport) so
+// exports can render the booking in ITS timezone instead of the viewer's.
+// Compact curated tables; unknown places fall back to floating local times.
+
+const TZ_BY_IATA = {
+  // Western Europe
+  LHR:'Europe/London', LGW:'Europe/London', LTN:'Europe/London', STN:'Europe/London', MAN:'Europe/London', EDI:'Europe/London', BRS:'Europe/London',
+  DUB:'Europe/Dublin', CDG:'Europe/Paris', ORY:'Europe/Paris', NCE:'Europe/Paris', LYS:'Europe/Paris', MRS:'Europe/Paris', TLS:'Europe/Paris',
+  AMS:'Europe/Amsterdam', EIN:'Europe/Amsterdam', BRU:'Europe/Brussels', CRL:'Europe/Brussels',
+  FRA:'Europe/Berlin', MUC:'Europe/Berlin', BER:'Europe/Berlin', DUS:'Europe/Berlin', HAM:'Europe/Berlin', CGN:'Europe/Berlin', SXF:'Europe/Berlin',
+  ZRH:'Europe/Zurich', GVA:'Europe/Zurich', VIE:'Europe/Vienna', LUX:'Europe/Luxembourg',
+  MAD:'Europe/Madrid', BCN:'Europe/Madrid', AGP:'Europe/Madrid', PMI:'Europe/Madrid', ALC:'Europe/Madrid', VLC:'Europe/Madrid',
+  LIS:'Europe/Lisbon', OPO:'Europe/Lisbon', FAO:'Europe/Lisbon', FNC:'Europe/Lisbon', PDL:'Atlantic/Azores',
+  FCO:'Europe/Rome', MXP:'Europe/Rome', LIN:'Europe/Rome', VCE:'Europe/Rome', NAP:'Europe/Rome', CTA:'Europe/Rome', PMO:'Europe/Rome', BLQ:'Europe/Rome',
+  ATH:'Europe/Athens', SKG:'Europe/Athens', IST:'Europe/Istanbul', SAW:'Europe/Istanbul', AYT:'Europe/Istanbul',
+  CPH:'Europe/Copenhagen', ARN:'Europe/Stockholm', OSL:'Europe/Oslo', HEL:'Europe/Helsinki', KEF:'Atlantic/Reykjavik',
+  WAW:'Europe/Warsaw', KRK:'Europe/Warsaw', PRG:'Europe/Prague', BUD:'Europe/Budapest', OTP:'Europe/Bucharest', CLJ:'Europe/Bucharest', SOF:'Europe/Sofia',
+  BEG:'Europe/Belgrade', ZAG:'Europe/Zagreb', SJJ:'Europe/Sarajevo', SKP:'Europe/Skopje', TIA:'Europe/Tirane', LJU:'Europe/Ljubljana',
+  RIX:'Europe/Riga', VNO:'Europe/Vilnius', TLL:'Europe/Tallinn', KBP:'Europe/Kyiv', KIV:'Europe/Chisinau', SVO:'Europe/Moscow', DME:'Europe/Moscow', VKO:'Europe/Moscow', LED:'Europe/Moscow',
+  MLA:'Europe/Malta', LCA:'Asia/Nicosia', JTR:'Europe/Athens', JMK:'Europe/Athens',
+  // North America
+  JFK:'America/New_York', EWR:'America/New_York', LGA:'America/New_York', BOS:'America/New_York', IAD:'America/New_York', DCA:'America/New_York',
+  PHL:'America/New_York', MIA:'America/New_York', ATL:'America/New_York', TPA:'America/New_York', MCO:'America/New_York', CLT:'America/New_York',
+  ORD:'America/Chicago', DFW:'America/Chicago', IAH:'America/Chicago', MSP:'America/Chicago', DTW:'America/Detroit', STL:'America/Chicago', MSY:'America/Chicago',
+  DEN:'America/Denver', LAS:'America/Los_Angeles', LAX:'America/Los_Angeles', SFO:'America/Los_Angeles', SEA:'America/Los_Angeles', PDX:'America/Los_Angeles', SAN:'America/Los_Angeles',
+  PHX:'America/Phoenix', SLC:'America/Denver', AUS:'America/Chicago',
+  HNL:'Pacific/Honolulu', ANC:'America/Anchorage', SJU:'America/Puerto_Rico',
+  YYZ:'America/Toronto', YVR:'America/Vancouver', YUL:'America/Montreal', YYC:'America/Edmonton', YOW:'America/Toronto',
+  MEX:'America/Mexico_City', CUN:'America/Cancun', GDL:'America/Mexico_City', PTY:'America/Panama', SJO:'America/Costa_Rica', HAV:'America/Havana',
+  // South America
+  GRU:'America/Sao_Paulo', GIG:'America/Sao_Paulo', CGH:'America/Sao_Paulo', BSB:'America/Sao_Paulo', EZE:'America/Argentina/Buenos_Aires', AEP:'America/Argentina/Buenos_Aires',
+  SCL:'America/Santiago', LIM:'America/Lima', BOG:'America/Bogota', MVD:'America/Montevideo', CCS:'America/Caracas', UIO:'America/Guayaquil', VVI:'America/La_Paz',
+  // Middle East & Africa
+  DXB:'Asia/Dubai', DWC:'Asia/Dubai', AUH:'Asia/Abu_Dhabi', SHJ:'Asia/Dubai', DOH:'Asia/Qatar', RUH:'Asia/Riyadh', JED:'Asia/Riyadh', DMM:'Asia/Riyadh',
+  KWI:'Asia/Kuwait', BAH:'Asia/Bahrain', MCT:'Asia/Muscat', AMM:'Asia/Amman', TLV:'Asia/Jerusalem', BEY:'Asia/Beirut', IKA:'Asia/Tehran', BGW:'Asia/Baghdad',
+  CAI:'Africa/Cairo', HRG:'Africa/Cairo', SSH:'Africa/Cairo', SPX:'Africa/Cairo', CMN:'Africa/Casablanca', RAK:'Africa/Casablanca', TUN:'Africa/Tunis', ALG:'Africa/Algiers',
+  JNB:'Africa/Johannesburg', CPT:'Africa/Johannesburg', DUR:'Africa/Johannesburg', NBO:'Africa/Nairobi', ADD:'Africa/Addis_Ababa', LOS:'Africa/Lagos', ACC:'Africa/Accra', DAR:'Africa/Dar_es_Salaam',
+  // Asia
+  SIN:'Asia/Singapore', KUL:'Asia/Kuala_Lumpur', PEN:'Asia/Kuala_Lumpur', BKK:'Asia/Bangkok', DMK:'Asia/Bangkok', CNX:'Asia/Bangkok', HKT:'Asia/Bangkok', USM:'Asia/Bangkok', UTP:'Asia/Bangkok',
+  SGN:'Asia/Ho_Chi_Minh', HAN:'Asia/Ho_Chi_Minh', DAD:'Asia/Ho_Chi_Minh', CXR:'Asia/Ho_Chi_Minh', PQC:'Asia/Ho_Chi_Minh', HUI:'Asia/Ho_Chi_Minh', VCA:'Asia/Ho_Chi_Minh',
+  PNH:'Asia/Phnom_Penh', VTE:'Asia/Vientiane', RGN:'Asia/Yangon',
+  CGK:'Asia/Jakarta', SUB:'Asia/Jakarta', DPS:'Asia/Makassar',
+  MNL:'Asia/Manila', CEB:'Asia/Manila', HKG:'Asia/Hong_Kong', TPE:'Asia/Taipei', KHH:'Asia/Taipei', MFM:'Asia/Macau',
+  PVG:'Asia/Shanghai', PEK:'Asia/Shanghai', PKX:'Asia/Shanghai', CAN:'Asia/Shanghai', SZX:'Asia/Shanghai', HGH:'Asia/Shanghai', CTU:'Asia/Shanghai', TFU:'Asia/Shanghai',
+  KMG:'Asia/Shanghai', XIY:'Asia/Shanghai', CKG:'Asia/Shanghai', WUH:'Asia/Shanghai', TAO:'Asia/Shanghai', XMN:'Asia/Shanghai', CSX:'Asia/Shanghai',
+  ICN:'Asia/Seoul', NRT:'Asia/Tokyo', HND:'Asia/Tokyo', KIX:'Asia/Tokyo', ITM:'Asia/Tokyo', CTS:'Asia/Tokyo', FUK:'Asia/Tokyo',
+  DEL:'Asia/Kolkata', BOM:'Asia/Kolkata', MAA:'Asia/Kolkata', BLR:'Asia/Kolkata', HYD:'Asia/Kolkata', CCU:'Asia/Kolkata', COK:'Asia/Kolkata', GOI:'Asia/Kolkata',
+  CMB:'Asia/Colombo', MLE:'Indian/Maldives', KTM:'Asia/Kathmandu', DAC:'Asia/Dhaka', ISB:'Asia/Karachi', KHI:'Asia/Karachi', LHE:'Asia/Karachi',
+  TAS:'Asia/Tashkent', ALA:'Asia/Almaty', TBS:'Asia/Tbilisi', EVN:'Asia/Yerevan', GYD:'Asia/Baku', ULN:'Asia/Ulaanbaatar',
+  // Oceania
+  SYD:'Australia/Sydney', MEL:'Australia/Melbourne', BNE:'Australia/Brisbane', PER:'Australia/Perth', ADL:'Australia/Adelaide', CNS:'Australia/Brisbane', OOL:'Australia/Brisbane', DRW:'Australia/Darwin',
+  AKL:'Pacific/Auckland', CHC:'Pacific/Auckland', WLG:'Pacific/Auckland', ZQN:'Pacific/Auckland', NAN:'Pacific/Fiji',
+};
+
+// Country/region words -> primary IANA zone (hotels rarely name the airport).
+const TZ_BY_PLACE = {
+  'singapore':'Asia/Singapore', 'hong kong':'Asia/Hong_Kong', 'macau':'Asia/Macau', 'taiwan':'Asia/Taipei', 'china':'Asia/Shanghai', 'chinese':'Asia/Shanghai',
+  'japan':'Asia/Tokyo', 'tokyo':'Asia/Tokyo', 'osaka':'Asia/Tokyo', 'kyoto':'Asia/Tokyo',
+  'south korea':'Asia/Seoul', 'korea':'Asia/Seoul', 'seoul':'Asia/Seoul',
+  'thailand':'Asia/Bangkok', 'bangkok':'Asia/Bangkok', 'phuket':'Asia/Bangkok', 'chiang mai':'Asia/Bangkok', 'chiangmai':'Asia/Bangkok', 'krabi':'Asia/Bangkok', 'samui':'Asia/Bangkok', 'pattaya':'Asia/Bangkok',
+  'vietnam':'Asia/Ho_Chi_Minh', 'viet nam':'Asia/Ho_Chi_Minh', 'ho chi minh':'Asia/Ho_Chi_Minh', 'saigon':'Asia/Ho_Chi_Minh', 'hanoi':'Asia/Ho_Chi_Minh', 'da nang':'Asia/Ho_Chi_Minh', 'danang':'Asia/Ho_Chi_Minh', 'nha trang':'Asia/Ho_Chi_Minh', 'hue':'Asia/Ho_Chi_Minh', 'phu quoc':'Asia/Ho_Chi_Minh',
+  'malaysia':'Asia/Kuala_Lumpur', 'kuala lumpur':'Asia/Kuala_Lumpur', 'penang':'Asia/Kuala_Lumpur',
+  'indonesia':'Asia/Jakarta', 'jakarta':'Asia/Jakarta', 'bali':'Asia/Makassar', 'denpasar':'Asia/Makassar',
+  'philippines':'Asia/Manila', 'manila':'Asia/Manila', 'cebu':'Asia/Manila',
+  'cambodia':'Asia/Phnom_Penh', 'laos':'Asia/Vientiane', 'myanmar':'Asia/Yangon', 'burma':'Asia/Yangon',
+  'india':'Asia/Kolkata', 'delhi':'Asia/Kolkata', 'mumbai':'Asia/Kolkata', 'goa':'Asia/Kolkata',
+  'maldives':'Indian/Maldives', 'sri lanka':'Asia/Colombo', 'nepal':'Asia/Kathmandu', 'bangladesh':'Asia/Dhaka', 'pakistan':'Asia/Karachi',
+  'united arab emirates':'Asia/Dubai', 'uae':'Asia/Dubai', 'dubai':'Asia/Dubai', 'abu dhabi':'Asia/Abu_Dhabi',
+  'saudi arabia':'Asia/Riyadh', 'qatar':'Asia/Qatar', 'doha':'Asia/Qatar', 'bahrain':'Asia/Bahrain', 'kuwait':'Asia/Kuwait', 'oman':'Asia/Muscat', 'muscat':'Asia/Muscat',
+  'israel':'Asia/Jerusalem', 'jordan':'Asia/Amman', 'lebanon':'Asia/Beirut', 'iraq':'Asia/Baghdad', 'iran':'Asia/Tehran', 'turkey':'Europe/Istanbul', 'turkiye':'Europe/Istanbul', 'istanbul':'Europe/Istanbul',
+  'egypt':'Africa/Cairo', 'cairo':'Africa/Cairo', 'morocco':'Africa/Casablanca', 'marrakech':'Africa/Casablanca', 'tunisia':'Africa/Tunis', 'algeria':'Africa/Algiers',
+  'south africa':'Africa/Johannesburg', 'kenya':'Africa/Nairobi', 'tanzania':'Africa/Dar_es_Salaam', 'zanzibar':'Africa/Dar_es_Salaam', 'nigeria':'Africa/Lagos', 'ethiopia':'Africa/Addis_Ababa', 'ghana':'Africa/Accra',
+  'united kingdom':'Europe/London', 'england':'Europe/London', 'scotland':'Europe/London', 'wales':'Europe/London', 'london':'Europe/London', 'edinburgh':'Europe/London', 'manchester':'Europe/London',
+  'ireland':'Europe/Dublin', 'dublin':'Europe/Dublin', 'iceland':'Atlantic/Reykjavik', 'reykjavik':'Atlantic/Reykjavik',
+  'portugal':'Europe/Lisbon', 'lisbon':'Europe/Lisbon', 'spain':'Europe/Madrid', 'madrid':'Europe/Madrid', 'barcelona':'Europe/Madrid', 'mallorca':'Europe/Madrid', 'ibiza':'Europe/Madrid', 'canary':'Atlantic/Canary', 'tenerife':'Atlantic/Canary',
+  'france':'Europe/Paris', 'paris':'Europe/Paris', 'nice':'Europe/Paris', 'marseille':'Europe/Paris', 'monaco':'Europe/Monaco', 'monaco montecarlo':'Europe/Monaco',
+  'belgium':'Europe/Brussels', 'netherlands':'Europe/Amsterdam', 'holland':'Europe/Amsterdam', 'amsterdam':'Europe/Amsterdam', 'luxembourg':'Europe/Luxembourg',
+  'germany':'Europe/Berlin', 'berlin':'Europe/Berlin', 'munich':'Europe/Berlin', 'frankfurt':'Europe/Berlin', 'hamburg':'Europe/Berlin', 'cologne':'Europe/Berlin',
+  'switzerland':'Europe/Zurich', 'zurich':'Europe/Zurich', 'geneva':'Europe/Zurich', 'austria':'Europe/Vienna', 'vienna':'Europe/Vienna',
+  'italy':'Europe/Rome', 'rome':'Europe/Rome', 'roma':'Europe/Rome', 'milan':'Europe/Rome', 'milano':'Europe/Rome', 'venice':'Europe/Rome', 'venezia':'Europe/Rome', 'florence':'Europe/Rome', 'naples':'Europe/Rome', 'sicily':'Europe/Rome', 'sardinia':'Europe/Rome',
+  'greece':'Europe/Athens', 'athens':'Europe/Athens', 'santorini':'Europe/Athens', 'mykonos':'Europe/Athens', 'cyprus':'Asia/Nicosia', 'malta':'Europe/Malta',
+  'croatia':'Europe/Zagreb', 'serbia':'Europe/Belgrade', 'slovenia':'Europe/Ljubljana', 'bosnia':'Europe/Sarajevo', 'albania':'Europe/Tirane', 'north macedonia':'Europe/Skopje',
+  'bulgaria':'Europe/Sofia', 'romania':'Europe/Bucharest', 'bucharest':'Europe/Bucharest', 'hungary':'Europe/Budapest', 'budapest':'Europe/Budapest',
+  'poland':'Europe/Warsaw', 'warsaw':'Europe/Warsaw', 'krakow':'Europe/Warsaw', 'czech':'Europe/Prague', 'czechia':'Europe/Prague', 'prague':'Europe/Prague',
+  'slovakia':'Europe/Bratislava', 'denmark':'Europe/Copenhagen', 'copenhagen':'Europe/Copenhagen', 'sweden':'Europe/Stockholm', 'stockholm':'Europe/Stockholm',
+  'norway':'Europe/Oslo', 'oslo':'Europe/Oslo', 'finland':'Europe/Helsinki', 'estonia':'Europe/Tallinn', 'latvia':'Europe/Riga', 'lithuania':'Europe/Vilnius',
+  'russia':'Europe/Moscow', 'moscow':'Europe/Moscow', 'ukraine':'Europe/Kyiv', 'kyiv':'Europe/Kyiv', 'kiev':'Europe/Kyiv', 'moldova':'Europe/Chisinau', 'georgia':'Asia/Tbilisi', 'armenia':'Asia/Yerevan', 'azerbaijan':'Asia/Baku',
+  'usa':'America/New_York', 'united states':'America/New_York', 'united states of america':'America/New_York', 'new york':'America/New_York', 'boston':'America/New_York', 'miami':'America/New_York', 'orlando':'America/New_York', 'washington':'America/New_York',
+  'chicago':'America/Chicago', 'houston':'America/Chicago', 'dallas':'America/Chicago', 'austin':'America/Chicago', 'seattle':'America/Los_Angeles', 'san francisco':'America/Los_Angeles', 'los angeles':'America/Los_Angeles', 'las vegas':'America/Los_Angeles', 'san diego':'America/Los_Angeles',
+  'canada':'America/Toronto', 'toronto':'America/Toronto', 'vancouver':'America/Vancouver', 'montreal':'America/Montreal',
+  'hawaii':'Pacific/Honolulu', 'honolulu':'Pacific/Honolulu', 'mexico':'America/Mexico_City', 'cancun':'America/Cancun', 'mexico city':'America/Mexico_City',
+  'cuba':'America/Havana', 'dominican republic':'America/Santo_Domingo', 'jamaica':'America/Jamaica', 'puerto rico':'America/Puerto_Rico', 'costa rica':'America/Costa_Rica', 'panama':'America/Panama',
+  'brazil':'America/Sao_Paulo', 'sao paulo':'America/Sao_Paulo', 'rio':'America/Sao_Paulo', 'rio de janeiro':'America/Sao_Paulo', 'argentina':'America/Argentina/Buenos_Aires', 'buenos aires':'America/Argentina/Buenos_Aires',
+  'chile':'America/Santiago', 'peru':'America/Lima', 'lima':'America/Lima', 'colombia':'America/Bogota', 'bogota':'America/Bogota', 'uruguay':'America/Montevideo', 'ecuador':'America/Guayaquil', 'bolivia':'America/La_Paz', 'venezuela':'America/Caracas',
+  'australia':'Australia/Sydney', 'sydney':'Australia/Sydney', 'melbourne':'Australia/Melbourne', 'brisbane':'Australia/Brisbane', 'perth':'Australia/Perth', 'adelaide':'Australia/Adelaide', 'gold coast':'Australia/Brisbane', 'cairns':'Australia/Brisbane',
+  'new zealand':'Pacific/Auckland', 'auckland':'Pacific/Auckland', 'queenstown':'Pacific/Auckland', 'fiji':'Pacific/Fiji', 'mongolia':'Asia/Ulaanbaatar', 'uzbekistan':'Asia/Tashkent',
+};
+
+// Precompiled word-boundary matchers, longest key first ("ho chi minh" beats
+// "minh"-ish fragments; "south korea" beats "korea"). Plain substring matching
+// would let "rio" match inside "prior" — hence the \b boundaries.
+const TZ_PLACE_LOOKUP = Object.keys(TZ_BY_PLACE)
+  .sort((a, b) => b.length - a.length)
+  .map((k) => ({ re: new RegExp('\\b' + escapeRe(k) + '\\b'), tz: TZ_BY_PLACE[k] }));
+
+// First place word found in `text` -> IANA zone; null when nothing matches.
+function tzFromText(text) {
+  const t = String(text || '').toLowerCase();
+  for (const entry of TZ_PLACE_LOOKUP) {
+    if (entry.re.test(t)) return entry.tz;
+  }
+  return null;
+}
+
+// "LHR → JFK" / "SIN - OTP" -> { start, end } airport zones.
+function tzFromRoute(route) {
+  if (!route) return { start: null, end: null };
+  var codes = (route.match(/\b[A-Z]{3}\b/g) || []).filter(function (c) { return TZ_BY_IATA[c]; });
+  return {
+    start: codes.length ? TZ_BY_IATA[codes[0]] : null,
+    end: codes.length > 1 ? TZ_BY_IATA[codes[codes.length - 1]] : (codes.length ? TZ_BY_IATA[codes[0]] : null),
+  };
 }
 
 // --- typed collectors -----------------------------------------------------------
@@ -380,6 +507,7 @@ function collectHotel(lines, consumed, events, defaults) {
       type: 'hotel',
       title: hotelTitle(lines, found.line) || 'Hotel stay',
       location: hotelLocation(lines, found.line),
+      tz: tzFromText(lines.slice(Math.max(0, found.line - 12), lastLine + 1).join(' ')),
       start: { date: dateKey(found.date), time: timeKey(found.time), inferred: !!found.date.yearInferred },
       end: { date: dateKey(outDate), time: timeKey(outTime) },
       confidence: (found.time || outTime) ? 'high' : 'medium',
@@ -477,7 +605,7 @@ function collectFlight(lines, consumed, events, defaults) {
     // keep scanning until the next date-bearing line so stacked layout blocks
     // ("Departing At: ... 17:15 18:30") still resolve.
     if (!depTime) {
-      for (let j = i + 1; j <= Math.min(i + 8, lines.length - 1); j++) {
+      for (let j = i + 1; j <= Math.min(i + 14, lines.length - 1); j++) {
         if (findDates(lines[j], defaults.now).length) break;
         const ts = findTimes(lines[j]);
         if (ts.length) {
@@ -513,6 +641,16 @@ function collectFlight(lines, consumed, events, defaults) {
         }
       }
     }
+    if (arrDate == null && depTime && depLine !== i) {
+      // Times came from a line below the date ("17:15 18:30") — a second time
+      // on that same line is the arrival.
+      const depLineTimes = findTimes(lines[depLine]);
+      if (depLineTimes.length >= 2) {
+        arrTime = pickSecondTime(lines[depLine], depTime);
+        arrDate = depDate;
+        arrLine = depLine;
+      }
+    }
     if (arrDate == null && depTime) {
       // Next standalone time after the departure-time line, before the next
       // date-bearing line (itinerary blocks like "10:25 / SIN / 20:15 / OTP").
@@ -537,11 +675,23 @@ function collectFlight(lines, consumed, events, defaults) {
       type: 'flight',
       title,
       location: routeOf(lines, i, -1, true) || '',
+      tz: null,
+      tzEnd: null,
       start: { date: dateKey(depDate), time: timeKey(depTime), inferred: !!depDate.yearInferred },
       end: arrDate ? { date: dateKey(arrDate), time: timeKey(arrTime) } : null,
       confidence: depTime ? 'high' : 'medium',
       source: lines.slice(i, Math.max(depLine, arrLine) + 1).join('\n'),
     });
+    // Departure airport sets the start zone, arrival airport the end zone.
+    // Without IATA codes, fall back to place words near the dep/arr lines.
+    const flightTz = tzFromRoute(route);
+    if (flightTz.start) {
+      ev.tz = flightTz.start;
+      ev.tzEnd = flightTz.end || flightTz.start;
+    } else {
+      ev.tz = tzFromText(lines.slice(i, depLine + 1).join(' '));
+      ev.tzEnd = (arrLine >= 0 ? tzFromText(lines[arrLine]) : null) || ev.tz;
+    }
     finalizeEvent(ev, defaults);
     events.push(ev);
     i = Math.max(i, Math.max(depLine, arrLine));
@@ -636,6 +786,7 @@ function collectTrain(lines, consumed, events, defaults) {
     const ev = mkEvent({
       type: 'train',
       title: route ? 'Train: ' + route : (lines[i].trim().split(/[|,·•]/)[0].slice(0, 60) || 'Train'),
+      tz: tzFromText(lines.slice(i, Math.max(i, arrLine) + 1).join(' ')),
       start: { date: dateKey(date), time: timeKey(startTime), inferred: !!date.yearInferred },
       end: endTime ? { date: dateKey(date), time: timeKey(endTime) } : null,
       confidence: startTime ? 'high' : 'medium',
@@ -666,6 +817,7 @@ function collectGeneric(lines, consumed, events, defaults) {
       ev = mkEvent({
         type: 'event',
         title: lineTitle(lines, i),
+        tz: tzFromText(line),
         start: { date: dateKey(date), time: timeKey(time), inferred: !!date.yearInferred },
         end: { date: dateKey(dates[1]), time: timeKey(t2) },
         confidence: time ? 'high' : 'medium',
@@ -673,10 +825,12 @@ function collectGeneric(lines, consumed, events, defaults) {
       });
     } else {
       const secondTime = time && pickSecondTime(line, time);
+      const evLocation = nearbyLabel(lines, i, /venue|address|location|where/i);
       ev = mkEvent({
         type: 'event',
         title: lineTitle(lines, i),
-        location: nearbyLabel(lines, i, /venue|address|location|where/i),
+        location: evLocation,
+        tz: tzFromText(line + ' ' + evLocation),
         start: { date: dateKey(date), time: timeKey(time), inferred: !!date.yearInferred },
         end: secondTime ? { date: dateKey(date), time: timeKey(secondTime) } : null,
         confidence: time ? 'medium' : 'low',
@@ -734,6 +888,8 @@ function dedupeNearDuplicates(events) {
         keep.end = other.end;
         delete keep.start.timeWasDefault;
       }
+      if (!keep.tz && other.tz) keep.tz = other.tz;
+      if (!keep.tzEnd && other.tzEnd) keep.tzEnd = other.tzEnd;
       if (!keep.location && other.location) keep.location = other.location;
       delete keep.start.timeWasDefault;
       if (keep.end) delete keep.end.timeWasDefault;

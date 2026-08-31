@@ -27,9 +27,14 @@ dependencies.
   `↑ ↑ ↓ ↓ ← → ← → B A`) unlocks unlimited conversions. Like safegeon, the
   counter is honest-user friction (localStorage), not access control.
 - **UI** — follows the design tokens in `websquadesign.md` (dark default +
-  light theme, CSS variables only). Times are written as *floating* local
-  times in ICS and links: source texts rarely state a timezone, so events land
-  in the user's calendar timezone instead of a guessed venue timezone.
+  light theme, CSS variables only).
+- **Venue timezones** — the parser detects the booking's timezone (departure/
+  arrival airports via IATA codes, hotel country/city) and exports render the
+  event at its true moment: ICS and calendar links carry UTC times converted
+  from the venue zone, so they're correct no matter whose calendar opens them.
+  Flights convert departure and arrival in their own zones. Unrecognized
+  places fall back to floating times. Adding via Google link can also be
+  shared: a copy-link pill sits next to the Google button.
 - The canonical production origin is **booktocal.com**; every other host
   302-redirects there (localhost exempt for dev).
 
@@ -112,9 +117,10 @@ node tests/extract.test.mjs    # PDF extraction + parse (generates its own PDF)
 
 ## Trade-offs
 
-- **Floating times**: events render in the viewer's calendar timezone. For a
-  hotel booked in another timezone this may be off by hours — the event is
-  editable before export by design.
+- **Timezone detection is heuristic**: a curated IATA/city/country table
+  covers common destinations; unknown places fall back to floating times
+  (render in the viewer's calendar timezone). Events are editable before
+  export by design.
 - **Deterministic parser**: exotic formats may need manual edits; policy
   lines ("cancel before...") are deliberately ignored.
 - **Year inference**: dates without a year roll to next year if they would

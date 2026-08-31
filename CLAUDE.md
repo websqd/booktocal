@@ -48,6 +48,10 @@ node tests/debug-pdfs.mjs      # print parse output for every PDF in tests/fixtu
   ↑↑↓↓←→←→BA. Same friction-not-enforcement model as safegeon.
 - Settings (targets, default time, default duration, no-time→all-day) persist
   in localStorage `btcSettings`; defaults: noon + 30 minutes.
+- Timezones: events carry `tz`/`tzEnd` (venue zones from IATA/city/country
+  tables in parser.js); ics.js converts wall times to UTC via Intl when known,
+  floating otherwise. Extend the tables, not the exporters, when a place
+  resolves wrong.
 - Parser heuristics live in one file; when adding patterns, add a fixture to
   tests and run all three test files. Policy/legalese lines are junk-filtered.
 - Every HTML response needs the per-response CSP nonce (see `htmlResponse`).

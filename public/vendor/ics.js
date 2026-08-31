@@ -13,6 +13,66 @@ var BTCCal = (function () {
 
   function pad2(n) { return String(n).padStart(2, '0'); }
 
+// --- timezone handling -------------------------------------------------------
+// When the parser knows the venue timezone, wall times are converted to UTC so
+// the event lands at the booking's actual moment regardless of the viewer's
+// calendar timezone. Unknown zones keep floating times (no Z suffix).
+//
+// Wall time in zone -> UTC Date, via Intl offsets (works in browser and node).
+function wallToUtcDate(dateIso, timeIso, tz) {
+  if (!tz) return null;
+  var p = dateIso.split('-').map(Number);
+  var t = (timeIso || '12:00').split(':').map(Number);
+  var asUtc = Date.UTC(p[0], p[1] - 1, p[2], t[0], t[1], 0);
+  function offsetMs(utcMs) {
+    try {
+      var dtf = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, hour12: false,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+      var parts = {};
+      for (var part of dtf.formatToParts(new Date(utcMs))) parts[part.type] = part.value;
+      // hour may come back "24" on some engines at midnight
+      var h = parts.hour === '24' ? 0 : Number(parts.hour);
+      var wallAsUtc = Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), h, Number(parts.minute), Number(parts.second));
+      return wallAsUtc - utcMs;
+    } catch (e) {
+      return null; // unknown zone -> caller falls back to floating
+    }
+  }
+  var off1 = offsetMs(asUtc);
+  if (off1 === null) return null;
+  var off2 = offsetMs(asUtc - off1); // refine once across DST edges (offsets in ms)
+  if (off2 === null) return null;
+  return new Date(asUtc - off2);
+}
+
+function utcIcs(d) {
+  return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) +
+    'T' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + 'Z';
+}
+
+function utcIso(d) {
+  return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate()) +
+    'T' + pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes()) + ':' + pad2(d.getUTCSeconds()) + 'Z';
+}
+
+function utcCompact(d) {
+  return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) +
+    'T' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + 'Z';
+}
+
+function utcLinkIso(d) {
+  return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate()) +
+    'T' + pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes()) + ':' + pad2(d.getUTCSeconds()) + 'Z';
+}
+
+function utcYahoo(d) {
+  return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) +
+    'T' + pad2(d.getUTCHours()) + pad2(d.getUTCMinutes()) + pad2(d.getUTCSeconds()) + 'Z';
+}
+
   function dtStamp() {
     var d = new Date();
     return d.getUTCFullYear() + pad2(d.getUTCMonth() + 1) + pad2(d.getUTCDate()) +
@@ -55,7 +115,8 @@ var BTCCal = (function () {
   }
 
   // Resolve the event's effective start/end in one place. Timed events with a
-  // null end time (hotel checkouts) fall back to the default time.
+  // null end time (hotel checkouts) fall back to the default time. When the
+  // parser knows the venue zone, wall times are additionally converted to UTC.
   function resolve(ev, settings) {
     var defTime = settings && settings.defaultTime ? settings.defaultTime : '12:00';
     var allDay = !!ev.allDay;
@@ -73,7 +134,14 @@ var BTCCal = (function () {
         end = { date: start.date, time: start.time };
       }
     }
-    return { start: start, end: end, allDay: allDay };
+    var utcStart = null, utcEnd = null;
+    if (!allDay && ev.tz) {
+      utcStart = wallToUtcDate(start.date, start.time, ev.tz);
+      utcEnd = wallToUtcDate(end.date, end.time, ev.tzEnd || ev.tz);
+      if (utcStart && !utcEnd) utcEnd = new Date(utcStart.getTime());
+      if (utcStart && utcEnd && utcEnd.getTime() < utcStart.getTime()) utcEnd = new Date(utcStart.getTime());
+    }
+    return { start: start, end: end, allDay: allDay, utcStart: utcStart, utcEnd: utcEnd };
   }
 
   function description(ev) {
@@ -101,6 +169,9 @@ var BTCCal = (function () {
       if (r.allDay) {
         lines.push('DTSTART;VALUE=DATE:' + fmtDate(r.start.date));
         lines.push('DTEND;VALUE=DATE:' + fmtDate(r.end.date));
+      } else if (r.utcStart) {
+        lines.push('DTSTART:' + utcIcs(r.utcStart));
+        lines.push('DTEND:' + utcIcs(r.utcEnd));
       } else {
         lines.push('DTSTART:' + fmtDateTime(r.start.date, r.start.time));
         lines.push('DTEND:' + fmtDateTime(r.end.date, r.end.time));
@@ -138,9 +209,14 @@ var BTCCal = (function () {
 
   function googleUrl(ev, settings) {
     var r = resolve(ev, settings);
-    var dates = r.allDay
-      ? fmtDate(r.start.date) + '/' + fmtDate(r.end.date)
-      : fmtDateTime(r.start.date, r.start.time) + '/' + fmtDateTime(r.end.date, r.end.time);
+    var dates;
+    if (r.allDay) {
+      dates = fmtDate(r.start.date) + '/' + fmtDate(r.end.date);
+    } else if (r.utcStart) {
+      dates = utcCompact(r.utcStart) + '/' + utcCompact(r.utcEnd);
+    } else {
+      dates = fmtDateTime(r.start.date, r.start.time) + '/' + fmtDateTime(r.end.date, r.end.time);
+    }
     return 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
       '&text=' + encodeURIComponent(ev.title || 'Event') +
       '&dates=' + dates +
@@ -155,6 +231,9 @@ var BTCCal = (function () {
       // Outlook all-day enddt is exclusive.
       startdt = r.start.date;
       enddt = r.end.date;
+    } else if (r.utcStart) {
+      startdt = utcLinkIso(r.utcStart);
+      enddt = utcLinkIso(r.utcEnd);
     } else {
       startdt = r.start.date + 'T' + r.start.time + ':00';
       enddt = r.end.date + 'T' + r.end.time + ':00';
@@ -176,7 +255,8 @@ var BTCCal = (function () {
       st = fmtDate(r.start.date);
       dur = 'allday';
     } else {
-      st = fmtDateTime(r.start.date, r.start.time);
+      // Durations are zone-independent; start carries the zone (UTC when known).
+      st = r.utcStart ? utcYahoo(r.utcStart) : fmtDateTime(r.start.date, r.start.time);
       var p1 = r.start.time.split(':').map(Number);
       var p2 = r.end.time.split(':').map(Number);
       var mins = (p2[0] * 60 + p2[1]) - (p1[0] * 60 + p1[1]);

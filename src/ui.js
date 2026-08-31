@@ -499,11 +499,13 @@ function metaLine(){
 function eventCard(ev, i){
   var conf = { high: 'high', medium: 'medium', low: 'low' }[ev.confidence] || 'medium';
   var confLabel = { high: 'high confidence', medium: 'medium confidence', low: 'low confidence' }[ev.confidence] || 'medium confidence';
+  var tzInfo = tzBadge(ev);
   var html = ''
     + '<article class="event-card card" data-idx="' + i + '">'
     + '<div class="event-head">'
     + '<span class="badge type-' + esc(ev.type) + '">' + esc(TYPE_LABELS[ev.type] || 'Event') + '</span>'
     + '<span class="badge conf-' + conf + '">' + esc(confLabel) + '</span>'
+    + '<span class="badge tz-pill" title="' + esc(tzInfo.title) + '">' + esc(tzInfo.label) + '</span>'
     + '<button type="button" class="icon-btn ev-del" data-del="' + i + '" aria-label="Delete event">'
     + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>'
     + '</button>'
@@ -536,9 +538,35 @@ function eventCard(ev, i){
   return html;
 }
 
+// Timezone pill: venue zone from the booking, or "local" when the parser
+// couldn't detect one (floating time — renders in the viewer's calendar zone).
+function tzBadge(ev){
+  if (!ev.tz){
+    return { label: 'local time', title: 'No timezone detected \\u2014 exports use floating times (render in your calendar\\u2019s timezone)' };
+  }
+  var label = offsetLabel(ev.tz);
+  var title = ev.tz;
+  if (ev.tzEnd && ev.tzEnd !== ev.tz){
+    label += ' \\u2192 ' + offsetLabel(ev.tzEnd);
+    title += ' \\u2192 ' + ev.tzEnd;
+  }
+  return { label: label, title: 'Booking timezone: ' + title };
+}
+
+function offsetLabel(tz){
+  try {
+    var parts = new Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(new Date());
+    for (var i = 0; i < parts.length; i++){
+      if (parts[i].type === 'timeZoneName') return parts[i].value.replace('GMT', 'UTC');
+    }
+  } catch (e){}
+  return tz;
+}
+
 // Per-event target buttons, driven by the settings. Apple has no web prefill —
 // it gets a derived .ics download; the standalone ".ics file" target is the
-// separate-ics option from settings.
+// separate-ics option from settings. Google gets an extra copy-link pill so
+// the prefill URL can be shared.
 function cardButtons(ev, i){
   var out = '';
   var defs = {
@@ -550,7 +578,12 @@ function cardButtons(ev, i){
   };
   for (var t in defs){
     if (!settings.targets[t]) continue;
-    out += '<button type="button" class="btn small secondary" data-export="' + t + '" data-idx="' + i + '">' + defs[t] + '</button>';
+    out += '<button type="button" class="btn secondary" data-export="' + t + '" data-idx="' + i + '">' + defs[t] + '</button>';
+    if (t === 'google'){
+      out += '<button type="button" class="btn secondary icon-only" data-copy-google="' + i + '" title="Copy shareable Google Calendar link" aria-label="Copy Google Calendar link">'
+        + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>'
+        + '</button>';
+    }
   }
   return out;
 }
@@ -580,6 +613,17 @@ function bindEventCards(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-export]'), function(btn){
     btn.addEventListener('click', function(){
       exportEvent(btn.getAttribute('data-export'), Number(btn.getAttribute('data-idx')));
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-copy-google]'), function(btn){
+    btn.addEventListener('click', function(){
+      var ev = currentEvents[Number(btn.getAttribute('data-copy-google'))];
+      if (!ev){ toast('Event not found', 'danger'); return; }
+      var link = BTCCal.googleUrl(ev, settings);
+      navigator.clipboard.writeText(link).then(
+        function(){ toast('Google Calendar link copied \\u2014 paste it anywhere', 'success'); },
+        function(){ toast('Clipboard access denied', 'danger'); }
+      );
     });
   });
 }
@@ -633,10 +677,14 @@ function applyField(ev, field, inp){
 
 qs('#add-event').addEventListener('click', function(){
   var today = todayIso();
+  var localTz = null;
+  try { localTz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e){}
   currentEvents.push({
     type: 'event',
     title: 'New event',
     location: '',
+    tz: localTz,
+    tzEnd: localTz,
     allDay: false,
     start: { date: today, time: settings.defaultTime },
     end: { date: today, time: plusMinutes(settings.defaultTime, settings.defaultDuration) },
@@ -924,6 +972,11 @@ textarea.input { resize: vertical; min-height: 220px; line-height: 1.6; }
   margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle);
 }
 .event-actions .field-label { margin-right: 4px; }
+/* Adding to calendars is the primary action — keep those buttons prominent. */
+.event-actions .btn { padding: 11px 20px; font-size: 15px; min-height: 48px; }
+.event-actions .btn.icon-only { padding: 11px; width: 48px; }
+.event-actions .btn.icon-only:hover { background: var(--surface-hover); }
+.tz-pill { background: var(--surface-hover) !important; color: var(--text-secondary) !important; }
 .export-bar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   margin-top: 24px; padding: 20px;
