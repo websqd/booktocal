@@ -1,0 +1,5 @@
+Booking details
+Kin Hotel Thi Sach Confirmed
+Booking ID	•	Check-in	•	Check-out	•	Room(s)	•	Guest(s)
+679845891	Nov 23, 2026	Nov 25, 2026	1 room	2 adults, 0 children
+You can also easily find out about property policies and amenities in Manage my booking.

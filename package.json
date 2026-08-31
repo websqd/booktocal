@@ -1,0 +1,14 @@
+{
+  "name": "bookingtocal",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "pdfjs-dist": "^6.3.289",
+    "wrangler": "^4.0.0"
+  }
+}

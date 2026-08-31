@@ -1,0 +1,51 @@
+	
+Flight details
+ 
+Singapore (SIN) - Bucharest (OTP)
+14 July 2026 Tuesday
+Economy Class (U)
+10:25
+SIN
+1 Connecting flight
+
+TK209      IST      TK1045
+20:15
+OTP
+	
+Journey duration
+14h 50m
+ 
+Change  	
+Refund / Cancellation  	
+Baggage Allowance  	
+	With 156,00 SGD penalty
+	With 623,00 SGD penalty - (In case of no-show)
+	Not allowed
+	Checked baggage: 30 kg
+	Cabin Baggage : 1 piece x 8 kg
+ 
+
+Bucharest (OTP) - Singapore (SIN)
+30 September 2026 Wednesday
+Economy Class (P)
+09:30
+OTP
+1 Connecting flight
+
+TK1044      IST      TK208
+08:45
+SIN
+Next day
+	
+Journey duration
+18h 15m
+ 
+Change  	
+Refund / Cancellation  	
+Baggage Allowance  	
+	With 156,00 SGD penalty
+	With 623,00 SGD penalty - (In case of no-show)
+	Not allowed
+	Checked baggage: 30 kg
+	Cabin Baggage : 1 piece x 8 kg
+

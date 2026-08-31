@@ -1,0 +1,41 @@
+{
+	// Cloudflare Worker config — https://developers.cloudflare.com/workers/wrangler/configuration/
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "bookingtocal",
+	"main": "src/index.js",
+	"compatibility_date": "2026-06-01",
+	// Static assets (vendored pdf.js). Everything else is served by the Worker so
+	// every HTML response carries a per-response CSP nonce.
+	"assets": {
+		"directory": "public",
+		"binding": "ASSETS"
+	},
+	// Secrets are NOT stored here. Set them with:
+	//   npx wrangler secret put UNLOCK_CODE   # freemium "already paid" code
+	"unsafe": {
+		"bindings": [
+			{
+				// Throttle POST /api/verify-code so the unlock code can't be brute-forced.
+				"name": "VERIFY_LIMITER",
+				"type": "ratelimit",
+				"namespace_id": "1001",
+				"simple": { "limit": 10, "period": 60 }
+			}
+		]
+	},
+	// Two-layer telemetry. Analytics Engine is the system of record (~3-month
+	// retention); observability turns on Workers Logs for console.log output.
+	"analytics_engine_datasets": [
+		{
+			"binding": "EVENTS",
+			"dataset": "bookingtocal_events"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		// Stripe (or any) payment URL opened by the paywall buttons.
+		"PAYMENT_LINK": ""
+	}
+}
