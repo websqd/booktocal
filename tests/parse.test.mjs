@@ -157,5 +157,30 @@ check('no dates -> no events', () => {
   assert.equal(events.length, 0);
 });
 
+// 15. Flight timezone from route IATA codes
+check('flight tz from route codes', () => {
+  const { events } = parseBooking(
+    'Flight BA 112\nLondon Heathrow (LHR) → New York JFK\nDeparture: Jul 30, 2026 6:20 PM\nArrival: Jul 30, 2026 9:05 PM',
+    DEF
+  );
+  assert.equal(events[0].tz, 'Europe/London');
+  assert.equal(events[0].tzEnd, 'America/New_York');
+});
+
+// 16. Hotel timezone from country/city in address
+check('hotel tz from address', () => {
+  const { events } = parseBooking(
+    'Booking confirmed\nHotel Europa Rome\nCheck-in: Fri, Sep 4, 2026 (from 14:00)\nCheck-out: Sun, Sep 6, 2026\nVia Nazionale 14, Rome, Italy',
+    DEF
+  );
+  assert.equal(events[0].tz, 'Europe/Rome');
+});
+
+// 17. No place info -> floating (null tz)
+check('unknown place keeps floating time', () => {
+  const { events } = parseBooking('Check-in: Sep 4, 2026 14:00\nCheck-out: Sep 6, 2026', DEF);
+  assert.equal(events[0].tz, null);
+});
+
 console.log(failures ? failures + ' failing' : 'all parser fixtures pass');
 process.exit(failures ? 1 : 0);
