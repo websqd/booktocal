@@ -1,6 +1,10 @@
-// bookingtocal UI pages. appPage() renders the whole single-page app shell.
-// All booking parsing/ICS work happens client-side in inline, nonce'd scripts;
-// the Worker never sees user content.
+// bookingtocal UI. appPage() renders the whole single-page app shell: token
+// CSS, markup, and the inline client script. All file reading, parsing and
+// calendar export happens client-side (public/vendor/*.js); the Worker never
+// sees user content.
+//
+// The client script lives inside a template literal: no backticks in client
+// code, backslashes doubled, and no "${" other than the two interpolations.
 
 export function appPage(nonce, payLink) {
   return `<!doctype html>
@@ -8,8 +12,8 @@ export function appPage(nonce, payLink) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BookToCal — booking emails to calendar events</title>
-<meta name="description" content="Paste a hotel, flight or train booking and get Google / Apple / Outlook calendar events or an .ics file. Parsing happens entirely in your browser.">
+<title>BookToCal — bookings to calendar events</title>
+<meta name="description" content="Drop flight, train, hotel or ticket confirmations — PDFs, screenshots, emails or pasted text — and get Google / Apple / Outlook calendar events with the right local times. Everything is read in your browser.">
 <style>${css()}</style>
 </head>
 <body>
@@ -43,37 +47,35 @@ export function appPage(nonce, payLink) {
     </button>
   </div>
 
-  <!-- Input -->
+  <!-- Composer: pasted text and any number of files, converted together -->
   <section id="compose" class="card hero-card">
-    <h1 class="headline-lg">Paste a booking.<br><span class="grad">Get calendar events.</span></h1>
-    <p class="sub">Hotel stays, flights, trains, tours &mdash; any confirmation email with a date. Turned into Google&nbsp;/&nbsp;Apple&nbsp;/&nbsp;Outlook events or an <span class="mono">.ics</span> file.</p>
+    <h1 class="headline-lg">Drop your bookings.<br><span class="grad">Get calendar events.</span></h1>
+    <p class="sub">Flights, trains, buses, hotels, show tickets, visas. Add as many confirmations as you like &mdash; each booking becomes its own event, in the local time of where it happens.</p>
 
-    <div class="tabs" role="tablist">
-      <button type="button" class="tab active" id="tab-text" role="tab" aria-selected="true">Paste text</button>
-      <button type="button" class="tab" id="tab-pdf" role="tab" aria-selected="false">PDF file</button>
+    <div id="append-note" class="append-note hidden">
+      <span id="append-text"></span>
+      <button type="button" id="append-cancel" class="link-btn">Back to events</button>
     </div>
 
-    <div id="pane-text">
-      <textarea id="text-input" class="input mono" rows="10" placeholder="Paste your booking confirmation email here&hellip;
+    <div id="dropzone" class="composer">
+      <label for="text-input" class="visually-hidden">Booking text</label>
+      <textarea id="text-input" class="input mono" rows="7" placeholder="Paste a confirmation email or itinerary here&hellip;
 
-e.g.
-Booking confirmation | Hotel Europa, Rome
-Check-in: Fri, Sep 4, 2026 (from 14:00)
-Check-out: Sun, Sep 6, 2026
-Confirmation number: 1234567890"></textarea>
-    </div>
-
-    <div id="pane-pdf" class="hidden">
-      <div id="pdf-drop" class="dropzone" tabindex="0" role="button" aria-label="Choose or drop a PDF">
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-        <p><strong>Drop a PDF here</strong> or click to choose</p>
-        <p class="drop-hint">Text is extracted in your browser &mdash; the file never leaves your device.</p>
-        <p id="pdf-name" class="mono pdf-name hidden"></p>
+Several bookings? Paste them one after another, separated by a line of ---"></textarea>
+      <ul id="file-list" class="file-list hidden" aria-label="Files to convert"></ul>
+      <div class="composer-bar">
+        <button type="button" id="add-files" class="btn secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+          Add files
+        </button>
+        <span class="composer-hint">PDFs, screenshots, emails (<span class="mono">.eml</span>), wallet passes &mdash; or drop them anywhere here</span>
       </div>
-      <input type="file" id="pdf-file" accept="application/pdf,.pdf" class="visually-hidden">
+      <div class="drop-veil" aria-hidden="true">Drop to add</div>
     </div>
+    <input type="file" id="file-input" multiple class="visually-hidden" tabindex="-1" aria-hidden="true">
 
     <div class="compose-actions">
+      <label class="check-row inline"><input type="checkbox" id="emoji-compose" checked> <span>Add emojis to titles <span class="hint-inline">&#9992;&#65039; &#128646; &#127976;</span></span></label>
       <button type="button" id="convert-btn" class="btn primary big">
         <span id="convert-label">Convert to events</span>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -82,7 +84,7 @@ Confirmation number: 1234567890"></textarea>
 
     <p class="privacy-note">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      100% private: parsing runs in your browser. Your booking text is never uploaded.
+      100% private: files are read and parsed in your browser. Nothing is uploaded.
     </p>
   </section>
 
@@ -90,22 +92,27 @@ Confirmation number: 1234567890"></textarea>
   <section id="results" class="hidden">
     <div class="results-toolbar">
       <div>
-        <p class="overline">Detected events</p>
+        <p class="overline">Your events</p>
         <p id="results-meta" class="results-meta"></p>
       </div>
       <div class="results-actions">
-        <button type="button" id="download-all" class="btn secondary">
+        <label class="check-row inline"><input type="checkbox" id="emoji-toggle" checked> <span>Emojis in titles</span></label>
+        <button type="button" id="download-all" class="btn primary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
-          All events (.ics)
+          <span id="download-all-label">All events (.ics)</span>
         </button>
-        <button type="button" id="add-event" class="btn secondary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          Add event
-        </button>
-        <button type="button" id="start-over" class="btn secondary">Convert another</button>
       </div>
     </div>
+    <div id="notices" class="notices hidden" role="status"></div>
     <div id="event-list" class="event-list"></div>
+    <div class="results-foot">
+      <button type="button" id="add-more" class="btn secondary">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        Add more bookings
+      </button>
+      <button type="button" id="add-event" class="btn secondary">Blank event</button>
+      <button type="button" id="start-over" class="btn secondary">Start over</button>
+    </div>
   </section>
 </main>
 
@@ -123,12 +130,19 @@ Confirmation number: 1234567890"></textarea>
 
   <div class="settings-group">
     <p class="overline">Calendar targets</p>
-    <p class="hint">Which buttons appear after a conversion.</p>
+    <p class="hint">Which buttons appear on each event.</p>
     <label class="check-row"><input type="checkbox" data-target="google" checked> <span>Google Calendar <span class="tag">default</span></span></label>
-    <label class="check-row"><input type="checkbox" data-target="apple"> <span>Apple Calendar <span class="hint-inline">(.ics derived)</span></span></label>
+    <label class="check-row"><input type="checkbox" data-target="apple"> <span>Apple Calendar <span class="hint-inline">(.ics file)</span></span></label>
     <label class="check-row"><input type="checkbox" data-target="outlook"> <span>Outlook</span></label>
     <label class="check-row"><input type="checkbox" data-target="yahoo"> <span>Yahoo</span></label>
-    <label class="check-row"><input type="checkbox" data-target="ics" checked> <span>.ics file <span class="hint-inline">(separate option)</span></span></label>
+    <label class="check-row"><input type="checkbox" data-target="ics" checked> <span>.ics file</span></label>
+  </div>
+
+  <div class="settings-group">
+    <p class="overline">Event style</p>
+    <label class="check-row"><input type="checkbox" id="set-emoji" checked> <span>Emojis in titles <span class="hint-inline">&#9992;&#65039; flights, &#128646; trains, &#127976; hotels&hellip;</span></span></label>
+    <label class="check-row"><input type="checkbox" id="set-hotel-allday" checked> <span>Hotel stays as all-day banners</span></label>
+    <p class="hint">Off: one timed block from check-in to check-out. Applies to the next conversion.</p>
   </div>
 
   <div class="settings-group">
@@ -150,11 +164,11 @@ Confirmation number: 1234567890"></textarea>
 <div id="gate" class="modal-wrap hidden" role="dialog" aria-modal="true" aria-labelledby="gate-title">
   <div class="modal">
     <h2 id="gate-title" class="headline-sm">Free limit reached</h2>
-    <p>You&rsquo;ve converted 3 bookings for free. A one-time payment of <strong>$5 or more</strong> unlocks unlimited conversions.</p>
+    <p>You&rsquo;ve converted 3 times for free. A one-time payment of <strong>$5 or more</strong> unlocks unlimited conversions.</p>
     <button type="button" id="pay-now-gate" class="btn primary big">Unlock unlimited &mdash; $5+</button>
     <p class="gate-alt">Already paid? <button type="button" id="show-code-entry" class="link-btn">Enter your unlock code</button></p>
     <div id="code-entry" class="code-entry hidden">
-      <input type="text" id="code" class="input mono" placeholder="Unlock code" autocomplete="off" spellcheck="false">
+      <input type="text" id="code" class="input mono" placeholder="Unlock code" autocomplete="off" spellcheck="false" aria-label="Unlock code">
       <button type="button" id="verify-code-btn" class="btn secondary">Activate</button>
       <p id="code-error" class="code-error" role="alert"></p>
     </div>
@@ -163,9 +177,13 @@ Confirmation number: 1234567890"></textarea>
 
 <div id="toasts" class="toasts" aria-live="polite"></div>
 
+<script src="/vendor/airports.js"></script>
+<script src="/vendor/geo.js"></script>
+<script src="/vendor/tz.js"></script>
 <script src="/vendor/parser.js"></script>
-<script src="/vendor/extract.js"></script>
 <script src="/vendor/ics.js"></script>
+<script src="/vendor/extract.js"></script>
+<script src="/vendor/intake.js"></script>
 <script nonce="${nonce}">
 'use strict';
 var PAY_LINK = ${JSON.stringify(payLink)};
@@ -173,54 +191,73 @@ var UPLOADS_KEY = 'btcConversions';
 var ACTIVATED_KEY = 'btcActivated';
 var SETTINGS_KEY = 'btcSettings';
 var THEME_KEY = 'btcTheme';
+var FREE_LIMIT = 3;
 
 var SETTING_DEFAULTS = {
   targets: { google: true, apple: true, outlook: false, yahoo: false, ics: true },
   defaultTime: '12:00',
   defaultDuration: 30,
-  noTimeAllDay: false
+  noTimeAllDay: false,
+  emoji: true,
+  hotelAllDay: true
 };
 
 var activated = false;
 var convertCount = 0;
 var settings = loadSettings();
-var currentEvents = [];
+var currentEvents = [];   // events on screen
+var pendingFiles = [];    // { id, file, kind, status: 'ready'|'working'|'done'|'error', note }
+var notices = [];         // { kind: 'warning'|'danger', text }
+var openEdits = {};       // event uid -> true while its edit form is open
+var appendMode = false;   // composer opened via "Add more bookings"
+var nextId = 1;
 
 function qs(s){ return document.querySelector(s); }
 function qsa(s){ return Array.prototype.slice.call(document.querySelectorAll(s)); }
 
-// --- state ---------------------------------------------------------------
+// --- settings -------------------------------------------------------------
 function loadSettings(){
+  var s = JSON.parse(JSON.stringify(SETTING_DEFAULTS));
   try {
     var raw = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null');
     if (raw && typeof raw === 'object') {
-      var s = { targets: {}, defaultTime: SETTING_DEFAULTS.defaultTime, defaultDuration: SETTING_DEFAULTS.defaultDuration, noTimeAllDay: !!raw.noTimeAllDay };
       for (var k in SETTING_DEFAULTS.targets) {
-        s.targets[k] = raw.targets ? raw.targets[k] === true : SETTING_DEFAULTS.targets[k];
+        if (raw.targets && typeof raw.targets[k] === 'boolean') s.targets[k] = raw.targets[k];
       }
       if (typeof raw.defaultTime === 'string' && /^\\d{2}:\\d{2}$/.test(raw.defaultTime)) s.defaultTime = raw.defaultTime;
       if (typeof raw.defaultDuration === 'number' && raw.defaultDuration >= 5 && raw.defaultDuration <= 720) s.defaultDuration = raw.defaultDuration;
-      return s;
+      s.noTimeAllDay = !!raw.noTimeAllDay;
+      if (typeof raw.emoji === 'boolean') s.emoji = raw.emoji;
+      if (typeof raw.hotelAllDay === 'boolean') s.hotelAllDay = raw.hotelAllDay;
     }
   } catch(e){}
-  return JSON.parse(JSON.stringify(SETTING_DEFAULTS));
+  return s;
 }
 function saveSettings(){
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch(e){}
 }
 
-// --- theme ---------------------------------------------------------------
-function applyTheme(t){
-  document.documentElement.setAttribute('data-theme', t);
-  try { localStorage.setItem(THEME_KEY, t); } catch(e){}
+// The emoji choice has three checkboxes (composer, results, settings): one setter.
+function setEmoji(on){
+  settings.emoji = !!on;
+  saveSettings();
+  ['#emoji-compose', '#emoji-toggle', '#set-emoji'].forEach(function(id){ qs(id).checked = settings.emoji; });
+  if (!qs('#results').classList.contains('hidden')) renderEvents();
 }
+['#emoji-compose', '#emoji-toggle', '#set-emoji'].forEach(function(id){
+  qs(id).addEventListener('change', function(){ setEmoji(this.checked); });
+});
+
+// --- theme ---------------------------------------------------------------
 (function initTheme(){
   var t = 'dark';
   try { t = localStorage.getItem(THEME_KEY) || 'dark'; } catch(e){}
   document.documentElement.setAttribute('data-theme', t);
 })();
 qs('#theme-btn').addEventListener('click', function(){
-  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  try { localStorage.setItem(THEME_KEY, t); } catch(e){}
 });
 
 // --- toasts --------------------------------------------------------------
@@ -229,58 +266,96 @@ function toast(msg, kind){
   el.className = 'toast' + (kind ? ' ' + kind : '');
   el.textContent = msg;
   qs('#toasts').appendChild(el);
-  setTimeout(function(){ el.classList.add('out'); }, 2600);
-  setTimeout(function(){ el.remove(); }, 3000);
+  setTimeout(function(){ el.classList.add('out'); }, 3200);
+  setTimeout(function(){ el.remove(); }, 3600);
 }
 
-// --- tabs ----------------------------------------------------------------
-qs('#tab-text').addEventListener('click', function(){ switchTab('text'); });
-qs('#tab-pdf').addEventListener('click', function(){ switchTab('pdf'); });
-function switchTab(which){
-  qs('#tab-text').classList.toggle('active', which === 'text');
-  qs('#tab-text').setAttribute('aria-selected', which === 'text');
-  qs('#tab-pdf').classList.toggle('active', which === 'pdf');
-  qs('#tab-pdf').setAttribute('aria-selected', which === 'pdf');
-  qs('#pane-text').classList.toggle('hidden', which !== 'text');
-  qs('#pane-pdf').classList.toggle('hidden', which !== 'pdf');
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+  });
 }
 
-// --- PDF dropzone (extraction wired later) --------------------------------
-var pdfFile = null;
-var drop = qs('#pdf-drop');
-drop.addEventListener('click', function(){ qs('#pdf-file').click(); });
-drop.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); qs('#pdf-file').click(); } });
-qs('#pdf-file').addEventListener('change', function(){ if (this.files[0]) acceptPdf(this.files[0]); });
-['dragover','dragenter'].forEach(function(ev){
-  drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add('over'); });
+// --- composer: files -------------------------------------------------------
+var KIND_LABEL = { pdf: 'PDF', image: 'Image', eml: 'Email', html: 'HTML', pkpass: 'Wallet pass', text: 'Text' };
+
+qs('#file-input').setAttribute('accept', BTCIntake.ACCEPT);
+qs('#add-files').addEventListener('click', function(){ qs('#file-input').click(); });
+qs('#file-input').addEventListener('change', function(){
+  addFiles(this.files);
+  this.value = '';
 });
-['dragleave','dragend'].forEach(function(ev){
-  drop.addEventListener(ev, function(){ drop.classList.remove('over'); });
-});
-drop.addEventListener('drop', function(e){
-  e.preventDefault(); drop.classList.remove('over');
-  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-  if (f) acceptPdf(f);
-});
-function acceptPdf(f){
-  if (!/pdf$/i.test(f.type) && !/\\.pdf$/i.test(f.name)) { toast('Please choose a PDF file', 'danger'); return; }
-  pdfFile = f;
-  qs('#pdf-name').textContent = f.name;
-  qs('#pdf-name').classList.remove('hidden');
+
+function addFiles(list){
+  var rejected = 0;
+  Array.prototype.forEach.call(list || [], function(f){
+    var kind = BTCIntake.kindOf(f);
+    if (!kind){ rejected++; return; }
+    var dup = pendingFiles.some(function(p){ return p.file.name === f.name && p.file.size === f.size; });
+    if (!dup) pendingFiles.push({ id: nextId++, file: f, kind: kind, status: 'ready', note: '' });
+  });
+  if (rejected) toast(rejected === 1 ? 'That file type is not supported' : rejected + ' files skipped (unsupported type)', 'warning');
+  renderFiles();
 }
+
+function renderFiles(){
+  var list = qs('#file-list');
+  list.classList.toggle('hidden', !pendingFiles.length);
+  list.innerHTML = pendingFiles.map(function(p){
+    var busy = p.status === 'working';
+    return '<li class="file-chip ' + esc(p.status) + '" data-file="' + p.id + '">'
+      + '<span class="file-kind">' + esc(KIND_LABEL[p.kind] || 'File') + '</span>'
+      + '<span class="file-name" title="' + esc(p.file.name) + '">' + esc(p.file.name) + '</span>'
+      + (p.note ? '<span class="file-note">' + esc(p.note) + '</span>' : '')
+      + (busy ? '<span class="spinner" aria-hidden="true"></span>'
+        : '<button type="button" class="icon-btn file-remove" data-remove="' + p.id + '" aria-label="Remove ' + esc(p.file.name) + '">'
+          + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>')
+      + '</li>';
+  }).join('');
+}
+qs('#file-list').addEventListener('click', function(e){
+  var btn = e.target.closest('[data-remove]');
+  if (!btn || converting) return;
+  var id = Number(btn.getAttribute('data-remove'));
+  pendingFiles = pendingFiles.filter(function(p){ return p.id !== id; });
+  renderFiles();
+});
+
+// Drag & drop over the whole composer; pasted screenshots count as files too.
+var zone = qs('#dropzone');
+var dragDepth = 0;
+function hasFiles(e){ return e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') > -1; }
+zone.addEventListener('dragenter', function(e){ if (!hasFiles(e)) return; e.preventDefault(); dragDepth++; zone.classList.add('over'); });
+zone.addEventListener('dragover', function(e){ if (hasFiles(e)) e.preventDefault(); });
+zone.addEventListener('dragleave', function(e){ if (!hasFiles(e)) return; dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) zone.classList.remove('over'); });
+zone.addEventListener('drop', function(e){
+  if (!hasFiles(e)) return;
+  e.preventDefault(); dragDepth = 0; zone.classList.remove('over');
+  addFiles(e.dataTransfer.files);
+});
+// Dropping a file outside the composer must not navigate away from the page.
+window.addEventListener('dragover', function(e){ if (hasFiles(e)) e.preventDefault(); });
+window.addEventListener('drop', function(e){ if (hasFiles(e)) e.preventDefault(); });
+qs('#text-input').addEventListener('paste', function(e){
+  var files = e.clipboardData && e.clipboardData.files;
+  if (files && files.length){ e.preventDefault(); addFiles(files); }
+});
 
 // --- settings drawer ------------------------------------------------------
 qs('#settings-btn').addEventListener('click', openSettings);
 qs('#settings-close').addEventListener('click', closeSettings);
 qs('#overlay').addEventListener('click', closeSettings);
-document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeSettings(); });
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !qs('#settings').classList.contains('hidden')) closeSettings(); });
 function openSettings(){
   qsa('[data-target]').forEach(function(cb){ cb.checked = !!settings.targets[cb.getAttribute('data-target')]; });
   qs('#set-time').value = settings.defaultTime;
   qs('#set-duration').value = String(settings.defaultDuration);
   qs('#set-allday').checked = !!settings.noTimeAllDay;
+  qs('#set-emoji').checked = !!settings.emoji;
+  qs('#set-hotel-allday').checked = !!settings.hotelAllDay;
   qs('#overlay').classList.remove('hidden');
   qs('#settings').classList.remove('hidden');
+  qs('#settings-close').focus();
 }
 function closeSettings(){
   qsa('[data-target]').forEach(function(cb){ settings.targets[cb.getAttribute('data-target')] = cb.checked; });
@@ -289,6 +364,7 @@ function closeSettings(){
   var d = parseInt(qs('#set-duration').value, 10);
   if (d >= 5 && d <= 720) settings.defaultDuration = d;
   settings.noTimeAllDay = qs('#set-allday').checked;
+  settings.hotelAllDay = qs('#set-hotel-allday').checked;
   saveSettings();
   if (!qs('#results').classList.contains('hidden')) renderEvents();
   qs('#overlay').classList.add('hidden');
@@ -299,24 +375,27 @@ function closeSettings(){
 function updateCounter(){
   var el = qs('#counter');
   if (activated){ el.className = 'counter unlimited'; el.textContent = '\\u221e'; return; }
-  el.className = 'counter' + (convertCount >= 2 ? ' low' : '');
-  el.textContent = convertCount + '/3 free';
+  el.className = 'counter' + (convertCount >= FREE_LIMIT - 1 ? ' low' : '');
+  el.textContent = convertCount + '/' + FREE_LIMIT + ' free';
 }
+// Show the composer (or the gate when the free conversions are used up).
 function renderEntryView(){
   var banner = qs('#payment-banner'), gate = qs('#gate'), compose = qs('#compose');
   updateCounter();
+  qs('#append-note').classList.toggle('hidden', !appendMode);
+  if (appendMode) qs('#append-text').textContent = 'Adding to your ' + currentEvents.length + ' event' + (currentEvents.length === 1 ? '' : 's') + '.';
   if (activated){
     gate.classList.add('hidden');
     banner.classList.add('hidden');
     compose.classList.remove('hidden');
-  } else if (convertCount >= 3){
+  } else if (convertCount >= FREE_LIMIT){
     compose.classList.add('hidden');
     banner.classList.add('hidden');
     gate.classList.remove('hidden');
   } else {
     gate.classList.add('hidden');
     compose.classList.remove('hidden');
-    banner.classList.toggle('hidden', convertCount < 2);
+    banner.classList.toggle('hidden', convertCount < FREE_LIMIT - 1);
   }
 }
 function incrementCounter(){
@@ -328,7 +407,7 @@ function incrementCounter(){
 function activateLocal(){
   try { localStorage.setItem(ACTIVATED_KEY, '1'); } catch(e){}
   activated = true;
-  renderEntryView();
+  if (qs('#results').classList.contains('hidden')) renderEntryView(); else { qs('#gate').classList.add('hidden'); updateCounter(); }
 }
 (function initState(){
   try {
@@ -394,122 +473,299 @@ document.addEventListener('keydown', function(e){
   } else { konamiIdx = 0; }
 });
 
-// --- convert: text/PDF -> parser -> events ---------------------------------
+// --- convert: text + files -> documents -> events ---------------------------
 var pdfjsModule = null;
 var converting = false;
 
-qs('#convert-btn').addEventListener('click', function(){ convertNow(); });
+function loadPdfjs(){
+  if (!pdfjsModule) pdfjsModule = import('/vendor/pdf.min.mjs');
+  return pdfjsModule;
+}
 
-function setBusy(on){
+function setBusy(on, label){
   converting = on;
   qs('#convert-btn').disabled = on;
-  qs('#convert-label').textContent = on ? 'Converting\\u2026' : 'Convert to events';
+  qs('#add-files').disabled = on;
+  qs('#convert-label').textContent = on ? (label || 'Converting\\u2026') : 'Convert to events';
 }
+
+qs('#convert-btn').addEventListener('click', function(){ convertNow(); });
+qs('#text-input').addEventListener('keydown', function(e){
+  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) convertNow();
+});
 
 async function convertNow(){
   if (converting) return;
-  if (!activated && convertCount >= 3){ renderEntryView(); return; }
-  var usePdf = qs('#tab-pdf').classList.contains('active');
-  var text = '';
-  if (usePdf){
-    if (!pdfFile){ toast('Choose a PDF first', 'warning'); return; }
-    setBusy(true);
-    try {
-      if (!pdfjsModule) pdfjsModule = await import('/vendor/pdf.min.mjs');
-      var buf = new Uint8Array(await pdfFile.arrayBuffer());
-      text = await BTCExtract.extractPdfText(pdfjsModule, buf);
-    } catch(e){
-      setBusy(false);
-      toast('Could not read that PDF', 'danger');
-      return;
-    }
-    setBusy(false);
-  } else {
-    text = qs('#text-input').value;
-  }
-  if (!text.trim()){ toast('Nothing to convert \\u2014 paste a booking first', 'warning'); return; }
+  if (!activated && convertCount >= FREE_LIMIT){ renderEntryView(); return; }
+  var text = qs('#text-input').value;
+  if (!text.trim() && !pendingFiles.length){ toast('Paste a booking or add a file first', 'warning'); return; }
+
   setBusy(true);
-  // Let the UI paint the busy state before the parse work.
-  await new Promise(function(r){ setTimeout(r, 30); });
-  var result = BTCParser.parseBooking(text, {
-    defaultTime: settings.defaultTime,
-    defaultDurationMin: settings.defaultDuration,
-    noTimeAllDay: settings.noTimeAllDay
-  });
-  setBusy(false);
-  if (!result.events.length){
-    toast('No dates found in that text', 'warning');
+  var docs = [];
+  var problems = [];
+  if (text.trim()) docs.push({ name: pendingFiles.length ? 'Pasted text' : '', text: text });
+
+  for (var i = 0; i < pendingFiles.length; i++){
+    var p = pendingFiles[i];
+    p.status = 'working'; p.note = 'Reading\\u2026';
+    renderFiles();
+    setBusy(true, pendingFiles.length > 1 ? 'Reading ' + (i + 1) + ' of ' + pendingFiles.length + '\\u2026' : 'Reading\\u2026');
+    try {
+      var out = await BTCIntake.read(p.file, {
+        pdfjs: loadPdfjs,
+        onProgress: (function(item){ return function(msg){ item.note = msg; var el = qs('[data-file="' + item.id + '"] .file-note'); if (el) el.textContent = msg; }; })(p)
+      });
+      docs = docs.concat(out);
+      p.status = 'done'; p.note = '';
+    } catch(e){
+      p.status = 'error';
+      p.note = 'Could not read this file';
+      problems.push({ kind: 'danger', text: 'Could not read ' + p.file.name + (e && e.message ? ' (' + e.message + ')' : '') });
+    }
+    renderFiles();
+  }
+  BTCIntake.releaseOcr();
+
+  setBusy(true, 'Finding bookings\\u2026');
+  await new Promise(function(r){ setTimeout(r, 30); }); // let the label paint
+  var result = { events: [] };
+  try {
+    result = BTCParser.parseDocuments(docs, {
+      defaultTime: settings.defaultTime,
+      defaultDurationMin: settings.defaultDuration,
+      noTimeAllDay: settings.noTimeAllDay,
+      hotelAllDay: settings.hotelAllDay
+    });
+  } catch(e){
+    setBusy(false);
+    toast('Something went wrong while reading that booking', 'danger');
     return;
   }
-  currentEvents = result.events;
+  setBusy(false);
+
+  // Tell the user which documents produced nothing.
+  var named = docs.filter(function(d){ return d.name; });
+  named.forEach(function(d){
+    var used = result.events.some(function(ev){ return ev.sources.indexOf(d.name) > -1; });
+    if (!used) problems.push({ kind: 'warning', text: 'No booking found in ' + d.name });
+  });
+
+  if (!result.events.length){
+    toast(problems.length && problems[0].kind === 'danger' ? problems[0].text : 'No dates found \\u2014 nothing to add to a calendar', 'warning');
+    return;
+  }
+
+  result.events.forEach(function(ev){ ev.uid = nextId++; });
+  var added = result.events.length;
+  var wasAppend = appendMode;
+  if (appendMode){
+    var fresh = result.events.filter(function(ev){ return !currentEvents.some(function(old){ return eventKey(old) === eventKey(ev); }); });
+    added = fresh.length;
+    if (fresh.length < result.events.length){
+      problems.push({ kind: 'warning', text: (result.events.length - fresh.length) + ' booking(s) were already in your list and were skipped' });
+    }
+    currentEvents = currentEvents.concat(fresh).sort(byStart);
+  } else {
+    currentEvents = result.events;
+    openEdits = {};
+  }
+  notices = problems;
+  appendMode = false;
   incrementCounter();
+  qs('#text-input').value = '';
+  pendingFiles = [];
+  renderFiles();
   renderEvents();
   qs('#compose').classList.add('hidden');
+  qs('#payment-banner').classList.add('hidden');
   qs('#results').classList.remove('hidden');
-  toast(currentEvents.length + ' event' + (currentEvents.length === 1 ? '' : 's') + ' found', 'success');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast(added + ' event' + (added === 1 ? '' : 's') + (wasAppend ? ' added' : ' found'), 'success');
+}
+
+function eventKey(ev){
+  var m = ev.meta || {};
+  return ev.type + '|' + String(m.number || ev.title).toLowerCase().replace(/\\s+/g, '') + '|' + ev.start.date;
+}
+function byStart(a, b){
+  var x = a.start.date + 'T' + (a.start.time || '00:00'), y = b.start.date + 'T' + (b.start.time || '00:00');
+  return x < y ? -1 : x > y ? 1 : 0;
 }
 
 qs('#start-over').addEventListener('click', function(){
+  currentEvents = []; notices = []; openEdits = {}; appendMode = false;
   qs('#results').classList.add('hidden');
   renderEntryView();
+  qs('#text-input').focus();
+});
+qs('#add-more').addEventListener('click', function(){
+  appendMode = true;
+  qs('#results').classList.add('hidden');
+  renderEntryView();
+  if (activated || convertCount < FREE_LIMIT) qs('#text-input').focus();
+});
+qs('#append-cancel').addEventListener('click', function(){
+  appendMode = false;
+  qs('#compose').classList.add('hidden');
+  qs('#gate').classList.add('hidden');
+  qs('#results').classList.remove('hidden');
 });
 
-// --- events: escaping, rendering, editing -----------------------------------
-function esc(s){
-  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
-    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
-  });
-}
-
-var TYPE_LABELS = { flight: 'Flight', hotel: 'Hotel', train: 'Train', event: 'Event' };
-
-function todayIso(){
-  var d = new Date();
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-}
-
-function plusMinutes(hhmm, mins){
-  var p = (hhmm || '12:00').split(':').map(Number);
-  var total = p[0] * 60 + p[1] + mins;
-  total = ((total % 1440) + 1440) % 1440;
-  return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
-}
+// --- results: rendering ------------------------------------------------------
+var TYPE_LABELS = { flight: 'Flight', train: 'Train', bus: 'Bus', ferry: 'Ferry', hotel: 'Stay', deadline: 'Deadline', event: 'Event' };
 
 function renderEvents(){
-  var list = qs('#event-list');
-  var html = '';
-  currentEvents.forEach(function(ev, i){ html += eventCard(ev, i); });
-  list.innerHTML = html;
-  bindEventCards();
+  qs('#event-list').innerHTML = currentEvents.map(eventCard).join('');
   qs('#results-meta').textContent = metaLine();
+  qs('#download-all-label').textContent = currentEvents.length === 1 ? 'Download .ics' : 'All ' + currentEvents.length + ' events (.ics)';
+  var box = qs('#notices');
+  box.classList.toggle('hidden', !notices.length);
+  box.innerHTML = notices.map(function(n){ return '<p class="notice ' + esc(n.kind) + '">' + esc(n.text) + '</p>'; }).join('');
 }
 
 function metaLine(){
   var n = currentEvents.length;
   if (!n) return '';
   var dates = currentEvents.map(function(e){ return e.start.date; }).sort();
-  var nice = function(iso){
-    var p = iso.split('-');
-    return new Date(p[0], p[1] - 1, p[2]).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  };
-  var span = dates.length > 1 ? nice(dates[0]) + ' \\u2013 ' + nice(dates[dates.length - 1]) : nice(dates[0]);
-  return n + (n === 1 ? ' event \\u00b7 ' : ' events \\u00b7 ') + span;
+  var first = shortDate(dates[0]), last = shortDate(dates[dates.length - 1]);
+  return n + (n === 1 ? ' event \\u00b7 ' : ' events \\u00b7 ') + (first === last ? first : first + ' \\u2013 ' + last);
+}
+
+// "Wed 25 Nov 2026" -> "25 Nov 2026"
+function shortDate(iso){ return BTCCal.niceDate(iso).replace(/^\\S+ /, ''); }
+
+function zoneLabel(tz, date, time){
+  return tz ? (BTCTz.offsetLabel(tz, date, time || '12:00') || '') : '';
+}
+
+function placeHtml(p){
+  if (!p) return '';
+  var name = p.city || p.name || p.code || '';
+  return esc(name) + (p.code && name !== p.code ? ' <span class="code">' + esc(p.code) + '</span>' : '');
+}
+
+// The "when" block: a two-ended journey for transport, a date range for
+// all-day events, one line for everything else.
+function whenBlock(ev){
+  var m = ev.meta || {};
+  var r = BTCCal.resolve(ev, settings);
+  var transport = ev.type === 'flight' || ev.type === 'train' || ev.type === 'bus' || ev.type === 'ferry';
+  if (r.allDay){
+    var lastDay = ev.end && ev.end.date && ev.end.date > ev.start.date ? ev.end.date : null;
+    var line = BTCCal.niceDate(ev.start.date) + (lastDay ? ' \\u2192 ' + BTCCal.niceDate(lastDay) : '');
+    var extra = [];
+    if (ev.type === 'hotel' && lastDay){
+      var nights = Math.round((Date.parse(lastDay) - Date.parse(ev.start.date)) / 86400000);
+      extra.push(nights + (nights === 1 ? ' night' : ' nights'));
+    } else {
+      extra.push('all day');
+    }
+    return '<p class="when-line">' + esc(line) + ' <span class="muted">\\u00b7 ' + esc(extra.join(' \\u00b7 ')) + '</span></p>'
+      + (transport && (m.from || m.to) ? '<p class="where-line">' + placeHtml(m.from) + ' \\u2192 ' + placeHtml(m.to) + '</p>' : '')
+      + (!transport && ev.location ? '<p class="where-line">' + esc(ev.location) + '</p>' : '');
+  }
+  if (transport){
+    var hasEnd = !!(ev.end && ev.end.time);
+    var dur = hasEnd && r.minutes > 0 ? BTCCal.niceDuration(r.minutes) : '';
+    var depZone = zoneLabel(ev.tz, r.start.date, r.start.time);
+    var arrZone = zoneLabel(ev.tzEnd || ev.tz, r.end.date, r.end.time);
+    return '<div class="journey">'
+      + '<div class="leg">'
+      + '<span class="leg-time">' + esc(r.start.time) + '</span>'
+      + '<span class="leg-place">' + (placeHtml(m.from) || '<span class="muted">Departure</span>') + '</span>'
+      + '<span class="leg-date">' + esc(BTCCal.niceDate(r.start.date)) + (depZone ? ' \\u00b7 ' + esc(depZone) : '') + '</span>'
+      + '</div>'
+      + '<div class="leg-mid" aria-hidden="true"><span class="leg-rule"></span>' + (dur ? '<span class="leg-dur">' + esc(dur) + '</span>' : '') + '<span class="leg-rule"></span></div>'
+      + '<div class="leg end">'
+      + '<span class="leg-time' + (ev.flags && ev.flags.endEstimated ? ' approx' : '') + '">' + (hasEnd ? (ev.flags && ev.flags.endEstimated ? '~' : '') + esc(r.end.time) : '\\u2014') + '</span>'
+      + '<span class="leg-place">' + (placeHtml(m.to) || '<span class="muted">Arrival</span>') + '</span>'
+      + '<span class="leg-date">' + (hasEnd ? esc(BTCCal.niceDate(r.end.date)) + (arrZone ? ' \\u00b7 ' + esc(arrZone) : '') : '') + '</span>'
+      + '</div>'
+      + '</div>';
+  }
+  var sameDay = r.end.date === r.start.date;
+  var zone = zoneLabel(ev.tz, r.start.date, r.start.time);
+  var when = BTCCal.niceDate(r.start.date) + ' \\u00b7 ' + r.start.time
+    + (r.minutes > 0 ? ' \\u2013 ' + (sameDay ? '' : BTCCal.niceDate(r.end.date) + ' ') + r.end.time : '');
+  return '<p class="when-line">' + esc(when) + (zone ? ' <span class="muted">\\u00b7 ' + esc(zone) + '</span>' : ' <span class="muted">\\u00b7 your local time</span>') + '</p>'
+    + (ev.location ? '<p class="where-line">' + esc(ev.location) + '</p>' : '');
+}
+
+function chipsFor(ev){
+  var m = ev.meta || {}, f = ev.flags || {};
+  var out = [];
+  var chip = function(label, value){ if (value) out.push('<li class="chip"><span class="chip-label">' + esc(label) + '</span> ' + esc(value) + '</li>'); };
+  var warn = function(text, title){ out.push('<li class="chip warn" title="' + esc(title || '') + '">' + esc(text) + '</li>'); };
+  if (m.airline) chip('Airline', m.airline);
+  if (m.via && m.via.length) chip('Connecting', m.via.join(', '));
+  chip('Boarding', m.boarding);
+  chip('Gate', m.gate);
+  chip('Coach', m.coach);
+  chip('Seat', m.seat);
+  if (ev.type === 'hotel'){
+    chip('Check-in', m.checkIn ? 'from ' + m.checkIn : '');
+    chip('Check-out', m.checkOut ? 'until ' + m.checkOut : '');
+    chip('Room', m.room);
+  }
+  chip(m.refLabel || 'Ref', m.ref);
+  if (f.endEstimated) warn('Arrival estimated', 'No arrival time in the document: estimated from the flight distance. Edit it if you know better.');
+  if (f.startIsBoarding) warn('Starts at boarding time', 'The document has no departure time, only a boarding time.');
+  if (f.yearAssumed) warn('Year assumed', 'The document has no year. Check the date.');
+  if (f.timeAssumed && !ev.allDay) warn('Time assumed', 'No time in the document: your default start time is used.');
+  if (ev.confidence === 'low' && !f.timeAssumed) warn('Check details', 'This one was hard to read. Check the details before adding it.');
+  (ev.notes || []).forEach(function(n){ if (/Another source/.test(n)) warn('Sources disagree', n); });
+  if (ev.sources && ev.sources.length) out.push('<li class="chip src" title="' + esc(ev.sources.join('\\n')) + '">' + esc(ev.sources.length === 1 ? ev.sources[0] : ev.sources.length + ' sources') + '</li>');
+  return out.length ? '<ul class="chips">' + out.join('') + '</ul>' : '';
 }
 
 function eventCard(ev, i){
-  var conf = { high: 'high', medium: 'medium', low: 'low' }[ev.confidence] || 'medium';
-  var confLabel = { high: 'high confidence', medium: 'medium confidence', low: 'low confidence' }[ev.confidence] || 'medium confidence';
-  var tzInfo = tzBadge(ev);
+  var open = !!openEdits[ev.uid];
   var html = ''
-    + '<article class="event-card card" data-idx="' + i + '">'
-    + '<div class="event-head">'
+    + '<article class="event-card card type-' + esc(ev.type) + '" data-idx="' + i + '">'
+    + '<header class="ev-top">'
+    + '<div class="ev-heading">'
     + '<span class="badge type-' + esc(ev.type) + '">' + esc(TYPE_LABELS[ev.type] || 'Event') + '</span>'
-    + '<span class="badge conf-' + conf + '">' + esc(confLabel) + '</span>'
-    + '<span class="badge tz-pill" title="' + esc(tzInfo.title) + '">' + esc(tzInfo.label) + '</span>'
-    + '<button type="button" class="icon-btn ev-del" data-del="' + i + '" aria-label="Delete event">'
+    + '<h2 class="ev-title" data-title>' + esc(BTCCal.titleOf(ev, settings)) + '</h2>'
+    + '</div>'
+    + '<div class="ev-tools">'
+    + '<button type="button" class="icon-btn" data-act="edit" aria-expanded="' + open + '" aria-label="Edit event" title="Edit">'
+    + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>'
+    + '</button>'
+    + '<button type="button" class="icon-btn ev-del" data-act="del" aria-label="Remove event" title="Remove">'
     + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>'
     + '</button>'
     + '</div>'
+    + '</header>'
+    + '<div class="ev-when">' + whenBlock(ev) + '</div>'
+    + chipsFor(ev)
+    + '<div class="event-actions">' + cardButtons() + '</div>';
+  if (open) html += editForm(ev);
+  return html + '</article>';
+}
+
+// Per-event target buttons, driven by the settings. Apple has no web prefill —
+// it gets an .ics download. Google gets an extra copy-link button so the
+// prefilled link can be shared.
+function cardButtons(){
+  var defs = { google: 'Google', apple: 'Apple', outlook: 'Outlook', yahoo: 'Yahoo', ics: '.ics file' };
+  var out = '<span class="field-label">Add to</span>';
+  var any = false;
+  for (var t in defs){
+    if (!settings.targets[t]) continue;
+    any = true;
+    out += '<button type="button" class="btn secondary" data-act="export" data-target-name="' + t + '">' + defs[t] + '</button>';
+    if (t === 'google'){
+      out += '<button type="button" class="btn secondary icon-only" data-act="copy" title="Copy shareable Google Calendar link" aria-label="Copy Google Calendar link">'
+        + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>'
+        + '</button>';
+    }
+  }
+  if (!any) out += '<span class="muted">No calendar targets selected \\u2014 pick some in Settings.</span>';
+  return out;
+}
+
+function editForm(ev){
+  var html = '<div class="ev-edit">'
     + '<div class="event-grid">'
     + '<label class="span2"><span class="field-label">Title</span>'
     + '<input type="text" class="input" data-field="title" value="' + esc(ev.title) + '"></label>'
@@ -528,128 +784,78 @@ function eventCard(ev, i){
       + '<label><span class="field-label">End time</span>'
       + '<input type="time" class="input" data-field="end.time" value="' + esc(ev.end && ev.end.time ? ev.end.time : '') + '"></label>';
   }
+  var zones = ev.tz ? ev.tz + (ev.tzEnd && ev.tzEnd !== ev.tz ? ' \\u2192 ' + ev.tzEnd : '') : '';
   html += '</div>'
-    + '<div class="event-actions">'
-    + '<span class="field-label">Add to</span>'
-    + cardButtons(ev, i)
-    + '</div>'
     + '<label class="check-row allday-row"><input type="checkbox" data-field="allDay" ' + (ev.allDay ? 'checked' : '') + '> <span>All-day event</span></label>'
-    + '</article>';
+    + '<p class="hint tz-hint">' + (ev.allDay ? 'All-day events have no timezone.'
+      : zones ? 'Times are local to ' + esc(zones) + ' and convert to your calendar\\u2019s timezone automatically.'
+        : 'No timezone detected \\u2014 times are added as-is in your calendar\\u2019s timezone.') + '</p>'
+    + '</div>';
   return html;
 }
 
-// Timezone pill: venue zone from the booking, or "local" when the parser
-// couldn't detect one (floating time — renders in the viewer's calendar zone).
-function tzBadge(ev){
-  if (!ev.tz){
-    return { label: 'local time', title: 'No timezone detected \\u2014 exports use floating times (render in your calendar\\u2019s timezone)' };
+// --- results: interaction (delegated) -----------------------------------------
+function cardEvent(target){
+  var card = target.closest('.event-card');
+  if (!card) return null;
+  var idx = Number(card.getAttribute('data-idx'));
+  return { card: card, idx: idx, ev: currentEvents[idx] };
+}
+
+qs('#event-list').addEventListener('click', function(e){
+  var btn = e.target.closest('[data-act]');
+  if (!btn) return;
+  var c = cardEvent(btn);
+  if (!c || !c.ev) return;
+  var act = btn.getAttribute('data-act');
+  if (act === 'edit'){
+    if (openEdits[c.ev.uid]) delete openEdits[c.ev.uid]; else openEdits[c.ev.uid] = true;
+    renderEvents();
+    var again = qs('.event-card[data-idx="' + c.idx + '"] ' + (openEdits[c.ev.uid] ? '[data-field="title"]' : '[data-act="edit"]'));
+    if (again) again.focus();
+  } else if (act === 'del'){
+    currentEvents.splice(c.idx, 1);
+    delete openEdits[c.ev.uid];
+    if (!currentEvents.length){ notices = []; qs('#results').classList.add('hidden'); renderEntryView(); }
+    else renderEvents();
+  } else if (act === 'export'){
+    exportEvent(btn.getAttribute('data-target-name'), c.ev);
+  } else if (act === 'copy'){
+    navigator.clipboard.writeText(BTCCal.googleUrl(c.ev, settings)).then(
+      function(){ toast('Google Calendar link copied \\u2014 paste it anywhere', 'success'); },
+      function(){ toast('Clipboard access denied', 'danger'); }
+    );
   }
-  var label = offsetLabel(ev.tz);
-  var title = ev.tz;
-  if (ev.tzEnd && ev.tzEnd !== ev.tz){
-    label += ' \\u2192 ' + offsetLabel(ev.tzEnd);
-    title += ' \\u2192 ' + ev.tzEnd;
-  }
-  return { label: label, title: 'Booking timezone: ' + title };
-}
-
-function offsetLabel(tz){
-  try {
-    var parts = new Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(new Date());
-    for (var i = 0; i < parts.length; i++){
-      if (parts[i].type === 'timeZoneName') return parts[i].value.replace('GMT', 'UTC');
-    }
-  } catch (e){}
-  return tz;
-}
-
-// Per-event target buttons, driven by the settings. Apple has no web prefill —
-// it gets a derived .ics download; the standalone ".ics file" target is the
-// separate-ics option from settings. Google gets an extra copy-link pill so
-// the prefill URL can be shared.
-function cardButtons(ev, i){
-  var out = '';
-  var defs = {
-    google: 'Google',
-    apple: 'Apple',
-    outlook: 'Outlook',
-    yahoo: 'Yahoo',
-    ics: '.ics file',
-  };
-  for (var t in defs){
-    if (!settings.targets[t]) continue;
-    out += '<button type="button" class="btn secondary" data-export="' + t + '" data-idx="' + i + '">' + defs[t] + '</button>';
-    if (t === 'google'){
-      out += '<button type="button" class="btn secondary icon-only" data-copy-google="' + i + '" title="Copy shareable Google Calendar link" aria-label="Copy Google Calendar link">'
-        + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>'
-        + '</button>';
-    }
-  }
-  return out;
-}
-
-function bindEventCards(){
-  qsa('.event-card').forEach(function(card){
-    var idx = Number(card.getAttribute('data-idx'));
-    Array.prototype.forEach.call(card.querySelectorAll('[data-field]'), function(inp){
-      var handler = function(){
-        applyField(currentEvents[idx], inp.getAttribute('data-field'), inp);
-      };
-      inp.addEventListener('change', handler);
-      var f = inp.getAttribute('data-field');
-      if (f === 'title' || f === 'location') inp.addEventListener('input', handler);
-    });
-    var del = card.querySelector('[data-del]');
-    if (del) del.addEventListener('click', function(){
-      currentEvents.splice(idx, 1);
-      if (!currentEvents.length){
-        qs('#results').classList.add('hidden');
-        renderEntryView();
-      } else {
-        renderEvents();
-      }
-    });
-  });
-  Array.prototype.forEach.call(document.querySelectorAll('[data-export]'), function(btn){
-    btn.addEventListener('click', function(){
-      exportEvent(btn.getAttribute('data-export'), Number(btn.getAttribute('data-idx')));
-    });
-  });
-  Array.prototype.forEach.call(document.querySelectorAll('[data-copy-google]'), function(btn){
-    btn.addEventListener('click', function(){
-      var ev = currentEvents[Number(btn.getAttribute('data-copy-google'))];
-      if (!ev){ toast('Event not found', 'danger'); return; }
-      var link = BTCCal.googleUrl(ev, settings);
-      navigator.clipboard.writeText(link).then(
-        function(){ toast('Google Calendar link copied \\u2014 paste it anywhere', 'success'); },
-        function(){ toast('Clipboard access denied', 'danger'); }
-      );
-    });
-  });
-}
-
-// --- export -----------------------------------------------------------------
-function exportEvent(target, idx){
-  var ev = currentEvents[idx];
-  if (!ev){ toast('Event not found', 'danger'); return; }
-  if (target === 'google'){ window.open(BTCCal.googleUrl(ev, settings), '_blank', 'noopener'); return; }
-  if (target === 'outlook'){ window.open(BTCCal.outlookUrl(ev, settings), '_blank', 'noopener'); return; }
-  if (target === 'yahoo'){ window.open(BTCCal.yahooUrl(ev, settings), '_blank', 'noopener'); return; }
-  // apple + ics both download .ics (Apple Calendar has no web prefill URL).
-  BTCCal.downloadIcs([ev], settings, slug(ev.title) + '.ics');
-}
-
-function slug(s){
-  return String(s || 'event').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'event';
-}
-
-qs('#download-all').addEventListener('click', function(){
-  if (!currentEvents.length){ toast('No events to export', 'warning'); return; }
-  BTCCal.downloadIcs(currentEvents, settings, 'booktocal-' + currentEvents.length + '-events.ics');
-  toast('.ics downloaded \\u2014 open it to import', 'success');
 });
 
+// Typing in the title updates the heading live; other fields re-render the
+// card once the value is committed.
+qs('#event-list').addEventListener('input', function(e){
+  var inp = e.target.closest('[data-field="title"], [data-field="location"]');
+  if (!inp) return;
+  var c = cardEvent(inp);
+  if (!c || !c.ev) return;
+  c.ev[inp.getAttribute('data-field')] = inp.value;
+  if (inp.getAttribute('data-field') === 'title') c.card.querySelector('[data-title]').textContent = BTCCal.titleOf(c.ev, settings);
+});
+qs('#event-list').addEventListener('change', function(e){
+  var inp = e.target.closest('[data-field]');
+  if (!inp) return;
+  var c = cardEvent(inp);
+  if (!c || !c.ev) return;
+  var field = inp.getAttribute('data-field');
+  if (field === 'title' || field === 'location') return; // handled on input
+  applyField(c.ev, field, inp);
+  renderEvents();
+});
+
+function dropNote(ev, re){
+  ev.notes = (ev.notes || []).filter(function(n){ return !re.test(n); });
+}
+
 function applyField(ev, field, inp){
+  var f = ev.flags || (ev.flags = {});
+  var m = ev.meta || {};
   if (field === 'allDay'){
     ev.allDay = inp.checked;
     if (ev.allDay){
@@ -657,52 +863,85 @@ function applyField(ev, field, inp){
       ev.end.time = null;
       ev.start.time = null;
     } else {
-      ev.start.time = settings.defaultTime;
-      if (ev.end && !ev.end.time) ev.end.time = settings.defaultTime;
+      // Hotels fall back to their check-in / check-out times.
+      ev.start.time = (ev.type === 'hotel' && m.checkIn) || settings.defaultTime;
+      if (!ev.end) ev.end = { date: ev.start.date, time: null };
+      ev.end.time = (ev.type === 'hotel' && m.checkOut) || (ev.end.date > ev.start.date ? settings.defaultTime : plusMinutes(ev.start.time, settings.defaultDuration));
     }
-    renderEvents();
     return;
   }
-  var v = inp.value;
-  if (field.indexOf('.') > -1){
-    var parts = field.split('.');
-    if (!ev[parts[0]]) ev[parts[0]] = {};
-    ev[parts[0]][parts[1]] = v || null;
-    if (parts[0] === 'start' && parts[1] === 'date' && ev.end && !ev.end.date) ev.end.date = v;
-  } else {
-    ev[field] = v;
+  var parts = field.split('.');
+  if (!ev[parts[0]]) ev[parts[0]] = { date: ev.start.date, time: null };
+  ev[parts[0]][parts[1]] = inp.value || null;
+  // A hand-edited value is no longer an assumption or an estimate.
+  if (field === 'start.date'){
+    if (!inp.value){ ev.start.date = todayIso(); }
+    if (ev.end && (!ev.end.date || ev.end.date < ev.start.date)) ev.end.date = ev.start.date;
+    delete f.yearAssumed; dropNote(ev, /no year/);
   }
-  qs('#results-meta').textContent = metaLine();
+  if (field === 'start.time'){ delete f.timeAssumed; delete f.startIsBoarding; dropNote(ev, /boarding time/); }
+  if (field === 'end.time' || field === 'end.date'){ delete f.endEstimated; delete f.endAssumed; dropNote(ev, /estimated/); }
+  if (field === 'end.date' && !inp.value) ev.end.date = ev.start.date;
 }
+
+function todayIso(){
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function plusMinutes(hhmm, mins){
+  var p = (hhmm || '12:00').split(':').map(Number);
+  var total = ((p[0] * 60 + p[1] + mins) % 1440 + 1440) % 1440;
+  return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
+}
+
+// --- export -----------------------------------------------------------------
+function exportEvent(target, ev){
+  if (target === 'google'){ window.open(BTCCal.googleUrl(ev, settings), '_blank', 'noopener'); return; }
+  if (target === 'outlook'){ window.open(BTCCal.outlookUrl(ev, settings), '_blank', 'noopener'); return; }
+  if (target === 'yahoo'){ window.open(BTCCal.yahooUrl(ev, settings), '_blank', 'noopener'); return; }
+  // apple + ics both download .ics (Apple Calendar has no web prefill URL).
+  BTCCal.downloadIcs([ev], settings, slug(ev.title) + '.ics');
+  toast('.ics downloaded \\u2014 open it to add the event', 'success');
+}
+
+function slug(s){
+  return String(s || 'event').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'event';
+}
+
+qs('#download-all').addEventListener('click', function(){
+  if (!currentEvents.length){ toast('No events to export', 'warning'); return; }
+  var name = currentEvents.length === 1 ? slug(currentEvents[0].title) : 'booktocal-' + currentEvents.length + '-events';
+  BTCCal.downloadIcs(currentEvents, settings, name + '.ics');
+  toast('.ics downloaded \\u2014 open it to import ' + (currentEvents.length === 1 ? 'the event' : 'all ' + currentEvents.length + ' events'), 'success');
+});
 
 qs('#add-event').addEventListener('click', function(){
   var today = todayIso();
   var localTz = null;
   try { localTz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e){}
-  currentEvents.push({
-    type: 'event',
-    title: 'New event',
-    location: '',
-    tz: localTz,
-    tzEnd: localTz,
-    allDay: false,
+  var ev = {
+    uid: nextId++, type: 'event', icon: '\\ud83d\\udcc5', title: 'New event', location: '',
+    tz: localTz, tzEnd: localTz, allDay: false,
     start: { date: today, time: settings.defaultTime },
     end: { date: today, time: plusMinutes(settings.defaultTime, settings.defaultDuration) },
-    confidence: 'medium',
-    source: ''
-  });
+    confidence: 'high', meta: { kind: 'event' }, notes: [], flags: {}, sources: []
+  };
+  currentEvents.push(ev);
+  openEdits[ev.uid] = true;
   renderEvents();
   var cards = document.querySelectorAll('.event-card');
-  if (cards.length){
-    var last = cards[cards.length - 1];
+  var last = cards[cards.length - 1];
+  if (last){
     last.scrollIntoView({ behavior: 'smooth', block: 'center' });
     var title = last.querySelector('[data-field="title"]');
-    if (title) title.focus();
+    if (title){ title.focus(); title.select(); }
   }
 });
 
 // --- app init ---------------------------------------------------------------
 (function initApp(){
+  qs('#emoji-compose').checked = qs('#emoji-toggle').checked = qs('#set-emoji').checked = settings.emoji;
   renderEntryView();
 })();
 </script>
@@ -764,8 +1003,9 @@ body {
   min-height: 100vh;
 }
 .mono { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; }
+.muted { color: var(--text-muted); }
 
-/* 2026 ambient backdrop: two slow-drifting accent glows */
+/* ambient backdrop: two slow-drifting accent glows */
 .aurora {
   position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
 }
@@ -785,7 +1025,8 @@ body {
 @keyframes drift1 { to { transform: translate(9vmax, 7vmax) scale(1.12); } }
 @keyframes drift2 { to { transform: translate(-8vmax, -6vmax) scale(0.94); } }
 @media (prefers-reduced-motion: reduce) {
-  .aurora::before, .aurora::after { animation: none; }
+  .aurora::before, .aurora::after, .spinner { animation: none; }
+  html { scroll-behavior: auto; }
 }
 
 /* --- top bar -------------------------------------------------------------- */
@@ -813,7 +1054,7 @@ body {
 .wordmark em { font-style: normal; color: var(--accent); }
 .top-actions { display: flex; align-items: center; gap: 8px; }
 
-.counter, .unlimited {
+.counter {
   display: inline-block; margin-right: 4px; font-size: 12px; font-weight: 500;
   padding: 3px 10px; border-radius: 9999px;
   background: var(--surface-hover); color: var(--text-secondary);
@@ -824,11 +1065,12 @@ body {
 
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border-radius: 8px;
+  width: 44px; height: 44px; border-radius: 8px; flex: none;
   background: transparent; border: 1px solid transparent; color: var(--text-secondary);
   cursor: pointer; transition: background 150ms ease-out, color 150ms ease-out;
 }
 .icon-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
+.icon-btn[aria-expanded="true"] { background: var(--surface-hover); color: var(--accent); }
 
 [data-theme="dark"] .icon-sun, [data-theme="light"] .icon-moon { display: none; }
 
@@ -842,32 +1084,20 @@ main {
   border-radius: 16px;
 }
 .hero-card { padding: 48px; }
-.headline-lg { font-size: 32px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15; margin: 0 0 12px; }
+.headline-lg { font-size: 32px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15; margin: 0 0 12px; text-wrap: balance; }
 .headline-sm { font-size: 20px; font-weight: 600; letter-spacing: -0.025em; margin: 0 0 12px; }
 .grad {
   background: linear-gradient(92deg, var(--accent), var(--info));
   -webkit-background-clip: text; background-clip: text;
   -webkit-text-fill-color: transparent; color: transparent;
 }
-.sub { color: var(--text-secondary); margin: 0 0 32px; max-width: 56ch; }
+.sub { color: var(--text-secondary); margin: 0 0 32px; max-width: 60ch; }
 .overline {
   font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--text-secondary); margin: 0 0 4px;
 }
 .hint { font-size: 13px; color: var(--text-muted); margin: 0 0 12px; }
 .hint-inline { font-size: 12px; color: var(--text-muted); }
-
-/* --- tabs ------------------------------------------------------------------ */
-.tabs {
-  display: flex; gap: 16px; border-bottom: 1px solid var(--border-default); margin-bottom: 20px;
-}
-.tab {
-  background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
-  padding: 8px 2px; font: inherit; font-weight: 500; color: var(--text-secondary);
-  cursor: pointer; transition: color 150ms ease-out;
-}
-.tab:hover { color: var(--text-primary); }
-.tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
 
 /* --- inputs ---------------------------------------------------------------- */
 .input {
@@ -878,24 +1108,72 @@ main {
 }
 .input::placeholder { color: var(--text-muted); }
 .input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-textarea.input { resize: vertical; min-height: 220px; line-height: 1.6; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.dropzone {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 48px 24px; text-align: center;
-  border: 1.5px dashed var(--border-strong); border-radius: 16px;
-  color: var(--text-secondary); cursor: pointer;
-  transition: background 150ms ease-out, border-color 150ms ease-out;
+/* --- composer --------------------------------------------------------------- */
+.composer {
+  position: relative; border-radius: 16px;
+  border: 1.5px dashed var(--border-strong);
+  background: var(--surface-input);
+  transition: border-color 150ms ease-out, background 150ms ease-out;
 }
-.dropzone:hover, .dropzone.over, .dropzone:focus-visible {
-  background: var(--surface-hover); border-color: var(--accent); color: var(--text-primary);
-  outline: none;
+.composer:focus-within { border-color: var(--accent); border-style: solid; }
+.composer.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.composer textarea.input {
+  display: block; border: 0; background: transparent; border-radius: 16px 16px 0 0;
+  resize: vertical; min-height: 168px; line-height: 1.6; padding: 16px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px;
 }
-.drop-hint { font-size: 13px; color: var(--text-muted); margin: 0; }
-.pdf-name { margin: 8px 0 0; color: var(--success); }
-.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.composer textarea.input:focus-visible { outline: none; }
+.composer-bar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px; border-top: 1px solid var(--border-default);
+}
+.composer-hint { font-size: 13px; color: var(--text-muted); flex: 1 1 220px; }
+.drop-veil {
+  position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  border-radius: 16px; font-weight: 600; color: var(--accent); pointer-events: none;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+}
+.composer.over .drop-veil { display: flex; }
 
-.compose-actions { display: flex; justify-content: flex-end; margin-top: 20px; }
+.file-list {
+  list-style: none; margin: 0; padding: 4px 16px 12px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px;
+  max-height: 248px; overflow-y: auto;
+}
+.file-chip {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  padding: 4px 4px 4px 12px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--border-default);
+}
+.file-kind {
+  flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 9999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
+}
+.file-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.file-note { flex: none; font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.file-chip.error { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.file-chip.error .file-note { color: var(--danger); }
+.file-remove { width: 36px; height: 36px; }
+.spinner {
+  flex: none; width: 16px; height: 16px; margin: 10px; border-radius: 50%;
+  border: 2px solid var(--border-strong); border-top-color: var(--accent);
+  animation: spin 800ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.append-note {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin: -8px 0 16px; padding: 10px 14px; border-radius: 8px; font-size: 14px;
+  background: color-mix(in srgb, var(--info) 10%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
+}
+.compose-actions {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  margin-top: 20px;
+}
 .privacy-note {
   display: flex; align-items: center; gap: 6px;
   margin: 24px 0 0; font-size: 13px; color: var(--text-muted);
@@ -937,56 +1215,92 @@ textarea.input { resize: vertical; min-height: 220px; line-height: 1.6; }
 
 /* --- results ------------------------------------------------------------------ */
 .results-toolbar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap; margin-bottom: 16px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px 24px; flex-wrap: wrap; margin-bottom: 16px;
 }
-.results-meta { margin: 0; color: var(--text-secondary); font-size: 14px; }
-.results-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.results-meta { margin: 0; color: var(--text-primary); font-size: 20px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.results-actions { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.results-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
+.notices { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.notice {
+  margin: 0; padding: 10px 14px; border-radius: 8px; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--border-default); border-left: 4px solid var(--warning);
+  overflow-wrap: anywhere;
+}
+.notice.danger { border-left-color: var(--danger); }
+
 .event-list { display: flex; flex-direction: column; gap: 12px; }
-.event-card { padding: 20px; }
-.event-head { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
-.event-head .badge:first-child { margin-right: auto; }
-.ev-del { width: 36px; height: 36px; margin-left: auto; }
+.event-card { padding: 20px; border-left: 4px solid var(--accent); }
+.event-card.type-flight { border-left-color: var(--info); }
+.event-card.type-hotel { border-left-color: var(--success); }
+.event-card.type-train, .event-card.type-bus, .event-card.type-ferry { border-left-color: var(--warning); }
+.event-card.type-deadline { border-left-color: var(--danger); }
+.ev-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ev-heading { min-width: 0; }
+.ev-title {
+  margin: 6px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.ev-tools { display: flex; gap: 2px; margin: -8px -8px 0 0; }
 .ev-del:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .badge {
-  font-size: 12px; font-weight: 500; padding: 2px 10px;
+  display: inline-block; font-size: 12px; font-weight: 500; padding: 2px 8px;
   border-radius: 9999px; white-space: nowrap;
 }
 .badge.type-flight { background: color-mix(in srgb, var(--info) 13%, transparent); color: var(--info); }
 .badge.type-hotel { background: color-mix(in srgb, var(--success) 13%, transparent); color: var(--success); }
-.badge.type-train { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--warning); }
+.badge.type-train, .badge.type-bus, .badge.type-ferry { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--warning); }
+.badge.type-deadline { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 .badge.type-event { background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent); }
-.badge.conf-high { background: var(--surface-hover); color: var(--text-secondary); }
-.badge.conf-medium { background: color-mix(in srgb, var(--warning) 10%, transparent); color: var(--warning); }
-.badge.conf-low { background: color-mix(in srgb, var(--danger) 10%, transparent); color: var(--danger); }
+
+.ev-when { margin-top: 16px; }
+.when-line { margin: 0; font-size: 16px; font-variant-numeric: tabular-nums; }
+.where-line { margin: 4px 0 0; font-size: 14px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.journey {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(72px, auto) minmax(0, 1fr);
+  align-items: center; gap: 16px;
+}
+.leg { display: flex; flex-direction: column; min-width: 0; }
+.leg.end { text-align: right; align-items: flex-end; }
+.leg-time { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.leg-time.approx { color: var(--text-secondary); }
+.leg-place { font-size: 14px; overflow-wrap: anywhere; }
+.leg-place .code {
+  font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; color: var(--text-secondary);
+  padding: 1px 6px; border-radius: 4px; background: var(--surface-hover); white-space: nowrap;
+}
+.leg-date { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.leg-mid { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
+.leg-rule { flex: 1 1 16px; height: 1px; background: var(--border-strong); }
+.leg-dur { font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.chips { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  font-size: 12px; padding: 2px 8px; border-radius: 9999px; max-width: 100%;
+  background: var(--surface-hover); color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chip-label { color: var(--text-muted); }
+.chip.warn { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); cursor: help; }
+.chip.src { background: transparent; border: 1px solid var(--border-default); color: var(--text-muted); max-width: 240px; }
+
+.event-actions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-default);
+}
+.field-label { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary); }
+.event-actions .field-label { margin-right: 4px; }
+.event-actions .btn.icon-only { padding: 10px; width: 44px; }
+
+.ev-edit { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-default); }
 .event-grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
 }
 .event-grid label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .event-grid .span2 { grid-column: span 2; }
-.field-label { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary); }
 .event-grid .input { padding: 9px 12px; }
-.allday-row { border-top: 1px solid var(--border-subtle); margin-top: 12px; padding-top: 12px; min-height: auto; }
-.event-actions {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border-subtle);
-}
-.event-actions .field-label { margin-right: 4px; }
-/* Adding to calendars is the primary action — keep those buttons prominent. */
-.event-actions .btn { padding: 11px 20px; font-size: 15px; min-height: 48px; }
-.event-actions .btn.icon-only { padding: 11px; width: 48px; }
-.event-actions .btn.icon-only:hover { background: var(--surface-hover); }
-.tz-pill { background: var(--surface-hover) !important; color: var(--text-secondary) !important; }
-.export-bar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 24px; padding: 20px;
-  background: var(--surface); border: 1px solid var(--border-default); border-radius: 16px;
-}
-.export-label { margin: 0 4px 0 0; }
-@media (max-width: 640px) {
-  .event-grid { grid-template-columns: 1fr; }
-  .event-grid .span2 { grid-column: auto; }
-}
+.allday-row { margin-top: 8px; }
+.tz-hint { margin: 0; overflow-wrap: anywhere; }
 
 /* --- settings slide-over ------------------------------------------------------- */
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; }
@@ -997,15 +1311,15 @@ textarea.input { resize: vertical; min-height: 220px; line-height: 1.6; }
   animation: slide-in 250ms ease-out;
 }
 @keyframes slide-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (max-width: 640px) { .slideover { width: 100vw; border-left: 0; } }
 .slideover-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .slideover-head .headline-sm { margin: 0; }
-.settings-group { border-top: 1px solid var(--border-subtle); padding: 16px 0; }
+.settings-group { border-top: 1px solid var(--border-default); padding: 16px 0; }
 .check-row {
   display: flex; align-items: center; gap: 10px; padding: 8px 0;
   cursor: pointer; min-height: 44px; color: var(--text-primary);
 }
-.check-row input { accent-color: var(--accent); width: 16px; height: 16px; }
+.check-row.inline { padding: 0; font-size: 14px; color: var(--text-secondary); }
+.check-row input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
 .tag {
   font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 9999px;
   background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
@@ -1036,14 +1350,15 @@ input[type="time"].input, input[type="number"].input { padding: 8px 10px; }
 
 /* --- toasts ---------------------------------------------------------------------- */
 .toasts {
-  position: fixed; right: 16px; bottom: 16px; z-index: 120;
-  display: flex; flex-direction: column; gap: 8px;
+  position: fixed; right: 16px; bottom: 16px; left: 16px; z-index: 120;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none;
 }
 .toast {
+  max-width: min(420px, 100%);
   background: var(--surface-raised); border: 1px solid var(--border-default);
   border-left: 4px solid var(--info);
   border-radius: 8px; box-shadow: var(--shadow-2);
-  padding: 10px 16px; font-size: 14px; color: var(--text-primary);
+  padding: 10px 16px; font-size: 14px; color: var(--text-primary); overflow-wrap: anywhere;
   animation: toast-in 250ms ease-out; transition: opacity 300ms ease-in, transform 300ms ease-in;
 }
 .toast.success { border-left-color: var(--success); }
@@ -1062,10 +1377,22 @@ input[type="time"].input, input[type="number"].input { padding: 8px 10px; }
 @media (max-width: 640px) {
   .topbar { padding: 10px 16px; }
   main { padding: 24px 16px 64px; }
-  .hero-card { padding: 24px; }
+  .foot { padding: 24px 16px 48px; }
+  .hero-card { padding: 24px 16px; }
   .headline-lg { font-size: 26px; }
-  .compose-actions { justify-content: stretch; }
+  .sub { margin-bottom: 24px; }
+  .compose-actions { flex-direction: column; align-items: stretch; }
   .compose-actions .btn { width: 100%; }
+  .slideover { width: 100vw; border-left: 0; }
+  .event-card { padding: 16px; }
+  .ev-title { font-size: 18px; }
+  .event-grid { grid-template-columns: 1fr; }
+  .event-grid .span2 { grid-column: auto; }
+  .journey { gap: 8px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .leg-time { font-size: 20px; }
+  .leg-mid .leg-rule:last-child { display: none; }
+  .results-actions { width: 100%; justify-content: space-between; }
+  .results-foot .btn { flex: 1 1 auto; }
 }
 
 /* --- focus & a11y ------------------------------------------------------------------- */

@@ -1,0 +1,21 @@
+Booking Number: RKR54P
+E-Boarding Pass
+You may proceed directly to the boarding
+gate using this e-boarding pass. You can
+download and share this e-boarding pass
+with other guests in your booking.
+ALEX JORDAN GUESTSON
+Kuala Lumpur	Bangkok - Don
+Mueang
+Kuala Lumpur
+International Airport	Don Mueang
+(T2)	International
+Airport (T1)
+KUL	DMK
+Flight No.	Depart date	Boarding time
+AK 892	11 Jan 2025	16:25
+11 Jan 2025
+Gate	Zone	Seat	Seq
+-	2	37F 87
+ASA
+Pdf Generated on: 2025-01-11 00:30:26

@@ -1,33 +1,31 @@
-// Extract + parse every real PDF fixture and print the resulting events.
-import { readFileSync } from 'node:fs';
-import { readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+// Extract + parse every PDF in tests/fixtures (or the paths given) and print
+// the resulting events.   node tests/debug-pdfs.mjs [file.pdf ...]
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.min.mjs';
+import { loadVendor } from './_load.mjs';
 
+const V = loadVendor();
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
-const extractSrc = readFileSync(join(dir, '..', '..', 'public/vendor/extract.js'), 'utf8');
-const { extractPdfText } = new Function(extractSrc + '; return BTCExtract;')();
-const parserSrc = readFileSync(join(dir, '..', '..', 'public/vendor/parser.js'), 'utf8');
-const { parseBooking } = new Function(parserSrc + '; return BTCParser;')();
-
 const workerUrl = new URL('../node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs', import.meta.url).href;
+const files = process.argv.length > 2 ? process.argv.slice(2) : readdirSync(dir).filter((n) => n.endsWith('.pdf')).map((n) => join(dir, n));
 
-for (const f of readdirSync(dir).filter((n) => n.endsWith('.pdf'))) {
-  const bytes = new Uint8Array(readFileSync(join(dir, f)));
+for (const f of files) {
   let text = '';
   try {
-    text = await extractPdfText(pdfjs, bytes, workerUrl);
+    text = await V.BTCExtract.extractPdfText(pdfjs, new Uint8Array(readFileSync(f)), workerUrl);
   } catch (e) {
-    console.log('=== ' + f + ' — EXTRACT ERROR: ' + e.message);
+    console.log('=== ' + basename(f) + ' — EXTRACT ERROR: ' + e.message);
     continue;
   }
-  const { events } = parseBooking(text, { now: new Date(2026, 7, 31) });
-  console.log('=== ' + f + ' → ' + events.length + ' event(s)');
-  console.log(text.split('\n').slice(0, 18).map((l) => '  | ' + l).join('\n'));
+  const { events } = V.BTCParser.parseBooking(text, { now: new Date(2026, 7, 31) });
+  console.log('=== ' + basename(f) + ' → ' + events.length + ' event(s)');
+  console.log(text.split('\n').slice(0, 18).map((l) => '  | ' + l.replace(/\t/g, ' ⇥ ')).join('\n'));
   for (const e of events) {
-    console.log('  → ' + e.type + ' | ' + e.title + ' | ' + e.start.date + ' ' + (e.start.time || '(all-day)' ) +
-      ' → ' + (e.end ? e.end.date + ' ' + (e.end.time || '') : '-') + ' | loc: ' + (e.location || '-'));
+    console.log('  → ' + e.icon + ' ' + e.type + ' | ' + e.title + ' | ' + e.start.date + ' ' + (e.start.time || '(all-day)') +
+      ' → ' + (e.end ? e.end.date + ' ' + (e.end.time || '') : '-') + ' | ' + (e.tz || 'floating') + ' | loc: ' + (e.location || '-'));
+    console.log(V.BTCCal.describe(e, {}).split('\n').map((l) => '      ' + l).join('\n'));
   }
   console.log();
 }

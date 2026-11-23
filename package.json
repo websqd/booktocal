@@ -5,10 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "node tests/parse.test.mjs && node tests/fixtures.test.mjs && node tests/ics.test.mjs && node tests/intake.test.mjs && node tests/extract.test.mjs",
+    "build:airports": "node scripts/build-airports.mjs"
   },
   "devDependencies": {
+    "airports-json": "^1.0.0",
+    "countries-and-timezones": "^3.11.0",
     "pdfjs-dist": "^6.3.289",
+    "tz-lookup": "^6.1.25",
     "wrangler": "^4.0.0"
   }
 }

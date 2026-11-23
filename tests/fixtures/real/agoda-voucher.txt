@@ -1,0 +1,48 @@
+Booking Confirmation
+Please present either an electronic or paper copy of your hotel voucher upon check-in.
+agoda	agoda	agoda	agoda	agoda	agoda	agoda	agoda	agoda	agoda	agoda
+Booking ID :	2000000001	Number of Rooms:
+1
+Number of Rooms :
+Booking Reference No :
+Number of Extra Beds :
+0
+Client :	Alex Guestson
+Number of Adults :
+2
+Member ID :	300000001
+Number of Children :
+0
+Country of Residence :	Romania / Romania
+Room Type :
+One Bed room Suite
+Property :
+Koulen Hotel
+Hotel :
+Promotion :
+Address :	Oknha Oum Chhay Street, Siem Reap
+For Full Promotion details and conditions see confirmation email
+Central Area, Siem Reap, Cambodia,
+17252
+Cancellation Policy: Stay flexible! Cancel for free before 25 November 2026. Any cancellation received on your check-in date will incur a charge of 100% of the
+booking value. Failure to arrive at your hotel or property will be treated as a No-Show and will incur a charge of 100% of the booking value (Hotel policy).
+Benefits Included Breakfast, Free WiFi, Drinking water, Express check-in, Parking, Coffee & tea, Free Fitness Center Access
+Arrival :	Departure :
+November 25, 2026	November 29, 2026
+Payment Method : MasterCard	Card No : XXXX-XXXX-XXXX-0000
+Booked And Payable Through :
+Booked And Payable By :
+Agoda Company Pte, Ltd.
+36 Robinson Road, City House #20-01,
+Singapore 068877
+Remarks :
+Guest List: Alex Guestson
+All special requests are subject to availability upon arrival
+Notes
+IMPORTANT: At check-in, you must present a valid photo ID with your address confirming the same name as the lead guest on the booking.
+All rooms are guaranteed on the day of arrival. In the case of a no-show, your room(s) will be released and you will be subject to
+the terms and conditions of the Cancellation/No-Show Policy specified at the time you made the booking as well as noted in
+the Confirmation Email.
+The total price for this booking does not include mini-bar items, telephone usage, laundry service, etc. The hotel will bill you directly.
+In cases where Breakfast is included with the room rate, please note that certain hotels may charge extra for children travelling with
+their parents. If applicable, the hotel will bill you directly. Upon arrival, if you have any questions, please verify with the hotel.

@@ -20,7 +20,10 @@ const lines = [
 
 let content = 'BT /F1 12 Tf 72 720 Td 16 TL\n';
 for (const l of lines) content += '(' + esc(l) + ') Tj T*\n';
-content += 'ET';
+content += 'ET\n';
+// A table row: two cells on one baseline, far apart — extraction must keep
+// them as separate columns (a TAB), not one four-word phrase.
+content += 'BT /F1 12 Tf 1 0 0 1 72 560 Tm (Bucuresti Nord) Tj 1 0 0 1 320 560 Tm (Piatra Neamt) Tj ET';
 
 const objs = [];
 objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';

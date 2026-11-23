@@ -1,0 +1,31 @@
+Seq. No. 058
+e-ticket - no coupon
+MR ALEX JORDAN GUESTSON you're ready to fly
+Flight	From	To	Group	Seat
+HEATHROW	CHANGI
+BA0011	9	24C
+(LONDON)	(SINGAPORE)
+Terminal 5	Terminal 1
+Date	Clear security by	Boarding At	Departure time
+02 October	19:00	18:35	19:35
+Operating Airline	Class	Booking reference
+British Airways	World Traveller	UQKHZP
+------------------------------------------------------------------------------
+We have checked your travel documents which are all in order
+We look forward to welcoming you on board
+BAG DROP	SECURITY	BOARDING
+Opens	Clear security by	Boarding at
+16:35	19:00	18:35
+Checked baggage to: Bag Drop	If you do not clear security by the	If you arrive late at the gate, your bags
+time indicated above you will not be	might be taken off the plane and you
+Closes: 45 minutes before departure
+accepted for your flight	may not be allowed to board.
+Take your boarding pass to a Bag Drop
+desk in zones D or G
+Customers with hand baggage only should go to a Passport and Visa check desks located
+Hand baggage only
+at North or South Security. You can also scan your passport on one of our self-service
+touchpoints or speak to any British Airways agent.
+Hand baggage allowance	Your checked baggage allowance
+Please see ba.com	1 (No bag to exceed 23kg/51lbs)
+------------------------------------------------------------------------------

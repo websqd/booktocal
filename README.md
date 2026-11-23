@@ -1,60 +1,78 @@
 # bookingtocal
 
-Turn booking emails (hotels, flights, trains, shows — anything with dates) or
-booking PDFs into calendar events: Google / Outlook / Yahoo prefill links or an
-`.ics` file. Single Cloudflare Worker, vanilla JS, no build step, no runtime
-dependencies.
+Turn booking confirmations — flights, trains, buses, hotels, show tickets,
+visas, anything with a date — into calendar events: Google / Outlook / Yahoo
+prefill links or `.ics` files. Paste text or drop any number of PDFs,
+screenshots, saved emails and wallet passes; every booking becomes its own
+event, in the local time of where it happens. Single Cloudflare Worker,
+vanilla JS, no build step, no runtime dependencies.
 
-- **Privacy-first parsing** — all parsing and PDF text extraction runs in the
-  browser. Booking text never leaves the page; the Worker serves UI and
-  verifies unlock codes, nothing else. No database, no storage, no logs of
-  user content.
-- **Deterministic parser** (`public/vendor/parser.js`) — recognizes hotel
-  check-in/out blocks, flight legs (numbers, routes, departure/arrival), train
-  journeys, and generic dated lines in the date formats real confirmation
-  emails use (ISO, US, EU, month names in EN/DE/FR/ES/IT, weekday prefixes,
-  12h/24h/`18h05`/`13∶10` times). Missing details use your defaults: start
-  12:00 (noon) and a 30-minute duration when the source has one date/time and
-  no interval (both configurable; optionally make time-less events all-day).
-- **PDF support** — vendored pdf.js (Apache-2.0, `public/vendor/`) extracts
-  text locally; the file never uploads.
-- **Editable results** — every detected event (title, times, location,
-  all-day) can be fixed before export, with per-event export buttons for the
-  calendar targets you enable in settings.
-- **Freemium** — 3 free conversions, then a paywall ("$5 or more",
-  `PAYMENT_LINK` var). A shared `UNLOCK_CODE` (verified server-side in
-  constant time) or the Konami easter egg (click the logo, then
-  `↑ ↑ ↓ ↓ ← → ← → B A`) unlocks unlimited conversions. Like safegeon, the
-  counter is honest-user friction (localStorage), not access control.
+- **Privacy-first** — files are read and parsed in the browser (PDF text
+  extraction, OCR, email and wallet-pass decoding included). Nothing is
+  uploaded; the Worker serves the UI and verifies unlock codes, nothing else.
+- **Many inputs, converted together** — pasted text (separate several
+  bookings with a line of `---`), PDFs (scanned ones fall back to OCR),
+  screenshots and photos (vendored tesseract.js, loaded only when an image is
+  added), `.eml` / `.html` / `.txt` emails (attachments included) and Apple
+  Wallet `.pkpass` files.
+- **One event per booking** — a document with two flights yields two events.
+  The same trip seen in several documents (an e-ticket and its boarding pass)
+  merges into one event that keeps the best of each: times from the boarding
+  pass, booking reference from the ticket. Disagreements are flagged.
+- **Readable events** — titles like `✈️ VN815: Ho Chi Minh City - Siem Reap`,
+  `🚆 IR 1657: București Nord - Piatra Neamț`, `🏨 Koulen Hotel, Siem Reap`
+  (emoji prefix is a checkbox, on by default; trains in Japan get 🚅, buses 🚌,
+  shows 🎭, circus 🎪, water parks 🌊 …). Descriptions list local departure and
+  arrival times with their UTC offsets, duration, seat/coach/gate and booking
+  reference.
+- **Right time everywhere** — departure and arrival are converted from their
+  own airport/city timezones to UTC on export, so the event is correct in any
+  calendar. A missing arrival time (boarding passes) is estimated from the
+  distance between the airports and marked as an estimate. Unknown places
+  stay floating.
+- **Deterministic parser** (`public/vendor/parser.js`) — no AI, no network.
+  Reads itinerary tables, boarding passes, train tickets, hotel vouchers and
+  free text in the date formats real confirmations use (ISO, US, EU, month
+  names in several languages, `28JAN`, `15Nov2026`, weekday prefixes,
+  12h/24h/`18h05` times). Bookkeeping dates (booked on, issued, date of
+  birth), policy text and office hours are ignored.
+- **Editable results** — every event can be corrected before export; hotel
+  stays are all-day banners by default (a timed block is one setting away).
+- **Freemium** — 3 free conversions (a conversion is one click, however many
+  files), then a paywall ("$5 or more", `PAYMENT_LINK` var). A shared
+  `UNLOCK_CODE` (verified server-side in constant time) or the Konami easter
+  egg (click the logo, then `↑ ↑ ↓ ↓ ← → ← → B A`) unlocks unlimited
+  conversions. The counter is honest-user friction (localStorage), not access
+  control.
 - **UI** — follows the design tokens in `websquadesign.md` (dark default +
   light theme, CSS variables only).
-- **Venue timezones** — the parser detects the booking's timezone (departure/
-  arrival airports via IATA codes, hotel country/city) and exports render the
-  event at its true moment: ICS and calendar links carry UTC times converted
-  from the venue zone, so they're correct no matter whose calendar opens them.
-  Flights convert departure and arrival in their own zones. Unrecognized
-  places fall back to floating times. Adding via Google link can also be
-  shared: a copy-link pill sits next to the Google button.
 - The canonical production origin is **booktocal.com**; every other host
   302-redirects there (localhost exempt for dev).
 
 ## How it works
 
 ```
-paste text or drop PDF ──► parser (browser) ──► editable event cards
-                                                    │
-        Google / Outlook / Yahoo prefill links ◄────┤
-        .ics download (single event or all) ◄───────┘
+paste text / drop files ─► intake.js ─► parser.js ─► event cards (editable)
+ PDF · image · eml · pkpass   to text    to events        │
+                                                           ├─► Google / Outlook / Yahoo links
+                                                           └─► .ics (one event or all)
 ```
+
+All of that is client-side JavaScript served from `/vendor/`:
+
+| File | Role |
+| --- | --- |
+| `intake.js` | file → text: PDF (`extract.js` + pdf.js), OCR, email MIME, HTML, `.pkpass` |
+| `parser.js` | text → events: collectors per booking type, cross-document merge |
+| `geo.js` + `airports.js` | airports (city, zone, coordinates), airlines, place → timezone |
+| `tz.js` | wall-clock ↔ UTC via `Intl` |
+| `ics.js` | titles, descriptions, `.ics`, calendar links |
 
 The Worker (`src/index.js`) has exactly two jobs:
 
 1. `GET /` — serve the app HTML with a per-response CSP nonce.
 2. `POST /api/verify-code` — constant-time compare of the unlock code against
    the `UNLOCK_CODE` secret, rate-limited per IP.
-
-Everything else (parsing, PDF extraction, ICS generation, settings) is
-client-side JavaScript served from `/vendor/`.
 
 ## Setup
 
@@ -90,10 +108,17 @@ invalid). The `VERIFY_LIMITER` rate-limit binding caps code guessing at
 ## Tests
 
 ```sh
-node tests/parse.test.mjs      # parser unit fixtures
-node tests/fixtures.test.mjs   # real booking copies (anonymized)
+npm test                       # everything below
+node tests/parse.test.mjs      # parser unit cases
+node tests/fixtures.test.mjs   # real bookings (anonymized): emails, PDF text, OCR, pastes, merging
+node tests/ics.test.mjs        # export: UTC conversion, titles, descriptions, folding
+node tests/intake.test.mjs     # HTML / .eml / zip / .pkpass conversion
 node tests/extract.test.mjs    # PDF extraction + parse (generates its own PDF)
+node tests/debug-pdfs.mjs      # print what the parser makes of each PDF fixture
 ```
+
+`public/vendor/airports.js` is generated: `npm run build:airports` (OurAirports
+data, public domain, via the `airports-json` dev dependency).
 
 ## Security
 
@@ -102,28 +127,38 @@ node tests/extract.test.mjs    # PDF extraction + parse (generates its own PDF)
   only unlock attempts (event, IP, country).
 - **CSP**: per-response nonce for the inline script; `script-src 'self'` for
   the vendored scripts; no `unsafe-inline` scripts; `connect-src 'self'`;
+  `worker-src 'self'` (pdf.js and the OCR engine run in same-origin workers);
   `base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
 - **Security headers** on every response: `nosniff`, `DENY` framing,
   `no-referrer`, HSTS (2y, includeSubDomains), restrictive `Permissions-Policy`.
 - **Unlock endpoint**: constant-time compare (SHA-256 + `timingSafeEqual`),
   fails closed when `UNLOCK_CODE` is unset, rate-limited 10/min/IP, input
   normalized (case/whitespace-insensitive) and length-capped.
-- **XSS**: all user-derived strings (parsed titles, locations, source text)
+- **XSS**: all user-derived strings (parsed titles, locations, file names)
   are HTML-escaped before insertion; ICS text is RFC 5545–escaped and lines
   are folded at 75 octets.
+- **Untrusted files**: HTML and email bodies are reduced to text with string
+  replacement, never inserted into the DOM; zip entries are size-capped.
 - **Freemium is friction, not enforcement** — the counter is client-side; a
   determined user can clear it. The unlock code is the only server-checked
   credential.
 
 ## Trade-offs
 
-- **Timezone detection is heuristic**: a curated IATA/city/country table
-  covers common destinations; unknown places fall back to floating times
-  (render in the viewer's calendar timezone). Events are editable before
-  export by design.
-- **Deterministic parser**: exotic formats may need manual edits; policy
-  lines ("cancel before...") are deliberately ignored.
-- **Year inference**: dates without a year roll to next year if they would
-  otherwise be in the past (bookings are usually future).
-- **Two-digit years are 20xx**; ambiguous slash dates default US (07/04 =
-  July 4), dotted dates default EU (04.07 = July 4).
+- **Deterministic parser**: layouts it has never seen may need manual edits;
+  that is the price of keeping everything in the browser. Events are editable
+  before export by design, and uncertain values are flagged on the card.
+- **Timezones** come from a table of ~3,200 airports plus country/city words;
+  unknown places fall back to floating times (rendered in the viewer's
+  calendar timezone).
+- **Estimated arrivals** use great-circle distance (roughly ±15%); they are
+  marked with `~` and a note in the description.
+- **Year inference**: a weekday next to the date pins the year. Otherwise a
+  date without a year is the next occurrence — unless it passed within the
+  last 45 days, in which case it stays in the current year.
+- **Slash dates**: one unambiguous date (`25/11/2026`) decides the whole
+  document; otherwise they default to US (07/04 = July 4). Dotted dates are
+  EU (04.07 = July 4).
+- **OCR** is English-trained and tuned for screenshots; photos of paper
+  tickets are hit-and-miss. The engine is a ~7 MB download the first time an
+  image is added.

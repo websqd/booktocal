@@ -9,7 +9,7 @@ endobj
 << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
 endobj
 4 0 obj
-<< /Length 252 >>
+<< /Length 343 >>
 stream
 BT /F1 12 Tf 72 720 Td 16 TL
 (Booking confirmed - Grand Hotel Plaza) Tj T*
@@ -19,6 +19,7 @@ BT /F1 12 Tf 72 720 Td 16 TL
 (Guest: John Doe) Tj T*
 (Total: 340.00 EUR) Tj T*
 ET
+BT /F1 12 Tf 1 0 0 1 72 560 Tm (Bucuresti Nord) Tj 1 0 0 1 320 560 Tm (Piatra Neamt) Tj ET
 endstream
 endobj
 5 0 obj
@@ -31,9 +32,9 @@ xref
 0000000058 00000 n 
 0000000115 00000 n 
 0000000241 00000 n 
-0000000544 00000 n 
+0000000635 00000 n 
 trailer
 << /Size 6 /Root 1 0 R >>
 startxref
-614
+705
 %%EOF

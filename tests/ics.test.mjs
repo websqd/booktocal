@@ -1,10 +1,11 @@
 // ICS generation + timezone conversion tests — plain node, no framework.
 //   node tests/ics.test.mjs
-import { readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 
-const icsSrc = readFileSync(new URL('../public/vendor/ics.js', import.meta.url), 'utf8');
-const { icsFor, googleUrl, outlookUrl, yahooUrl } = new Function(icsSrc + '; return BTCCal;')();
+import { loadVendor } from './_load.mjs';
+const V = loadVendor();
+const { icsFor, googleUrl, outlookUrl, yahooUrl, titleOf, describe } = V.BTCCal;
+const { parseBooking } = V.BTCParser;
 
 let failures = 0;
 function check(name, fn) {
@@ -90,6 +91,75 @@ check('unknown zone string falls back to floating', () => {
     start: { date: '2026-07-30', time: '18:20' }, end: { date: '2026-07-30', time: '19:20' } };
   const ics = icsFor([ev], SET);
   assert.match(ics, /DTSTART:20260730T182000\r\n/);
+});
+
+// --- titles, emoji, descriptions ------------------------------------------------------
+
+const FLIGHT = parseBooking(
+  'E-ticket\nHo Chi Minh City SGN → Siem Reap SAI\n19:30 SGN Ho Chi Minh City, Vietnam\nWed, 25 Nov 2026\nFlight no: VN815\n20:30 SAI Siem Reap, Cambodia\nSeat 28D\nBooking reference: ABC123',
+  { now: new Date(2026, 7, 31) }
+).events[0];
+
+check('emoji prefix is on by default and can be switched off', () => {
+  assert.equal(titleOf(FLIGHT, {}), '✈️ VN815: Ho Chi Minh City - Siem Reap');
+  assert.equal(titleOf(FLIGHT, { emoji: false }), 'VN815: Ho Chi Minh City - Siem Reap');
+  assert.match(icsFor([FLIGHT], { emoji: true }), /SUMMARY:✈️ VN815: Ho Chi Minh City - Siem Reap/);
+  assert.match(icsFor([FLIGHT], { emoji: false }), /SUMMARY:VN815: Ho Chi Minh City - Siem Reap/);
+  assert.match(googleUrl(FLIGHT, { emoji: true }), /text=%E2%9C%88%EF%B8%8F%20VN815/);
+});
+
+check('flight description: local times with offsets, duration, seat, booking ref', () => {
+  const d = describe(FLIGHT, SET);
+  assert.match(d, /^Vietnam Airlines VN815$/m);
+  assert.match(d, /^Departs: Wed 25 Nov 2026, 19:30 \(UTC\+7\) · Ho Chi Minh City \(SGN\), Tan Son Nhat Airport$/m);
+  assert.match(d, /^Arrives: Wed 25 Nov 2026, 20:30 \(UTC\+7\) · Siem Reap \(SAI\)/m);
+  assert.match(d, /^Duration: 1h$/m);
+  assert.match(d, /^Seat: 28D$/m);
+  assert.match(d, /^Booking ref: ABC123$/m);
+  assert.doesNotMatch(d, /Guest|Passenger/i);
+  assert.match(d, /BookToCal/);
+});
+
+check('description follows edits made after parsing', () => {
+  const ev = JSON.parse(JSON.stringify(FLIGHT));
+  ev.start.time = '21:00';
+  ev.end.time = '22:15';
+  const d = describe(ev, SET);
+  assert.match(d, /Departs: Wed 25 Nov 2026, 21:00/);
+  assert.match(d, /Duration: 1h 15m/);
+});
+
+check('duration across timezones uses real elapsed time', () => {
+  const ev = parseBooking('Flight TK209\nSIN - OTP\n14 July 2026 10:25 - 20:15', { now: new Date(2026, 7, 31) }).events[0];
+  assert.match(describe(ev, SET), /Duration: 14h 50m/); // +08 -> +03
+});
+
+check('hotel description: check-in/out, nights, booking id', () => {
+  const ev = parseBooking(
+    'Hotel Europa Rome\nCheck-in: Fri, Sep 4, 2026 (from 14:00)\nCheck-out: Sun, Sep 6, 2026 (until 11:00)\nConfirmation number: 1234567890',
+    { now: new Date(2026, 7, 31) }
+  ).events[0];
+  const d = describe(ev, SET);
+  assert.match(d, /^Check-in: Fri 4 Sep 2026, from 14:00$/m);
+  assert.match(d, /^Check-out: Sun 6 Sep 2026, until 11:00$/m);
+  assert.match(d, /^Nights: 2$/m);
+  assert.match(d, /^Booking ID: 1234567890$/m);
+  const ics = icsFor([ev], SET);
+  assert.match(ics, /DTSTART;VALUE=DATE:20260904/);
+  assert.match(ics, /DTEND;VALUE=DATE:20260907/);
+});
+
+check('Google link names the departure timezone', () => {
+  assert.match(googleUrl(FLIGHT, SET), /&ctz=Asia%2FHo_Chi_Minh/);
+});
+
+check('folded ICS lines stay within 75 bytes and never split a character', () => {
+  const ev = { type: 'event', icon: '🎭', title: 'Ünïcödé '.repeat(12) + '🎪🎪🎪', allDay: false, tz: null,
+    start: { date: '2026-07-30', time: '18:20' }, end: { date: '2026-07-30', time: '19:20' } };
+  const ics = icsFor([ev], { emoji: true });
+  for (const line of ics.split('\r\n')) assert.ok(Buffer.byteLength(line, 'utf8') <= 75, line);
+  const unfolded = ics.replace(/\r\n /g, '');
+  assert.ok(unfolded.includes('SUMMARY:🎭 ' + 'Ünïcödé '.repeat(12) + '🎪🎪🎪'));
 });
 
 console.log(failures ? failures + ' failing' : 'all ics tests pass');

@@ -1,0 +1,44 @@
+'
+OLCI / CHKS
+BOARDING PASS
+'
+Alex Guestson
+Name
+Gender / Passenger type	Male / ADT
+PNR / SEQ	VGKIXP / 0083
+DEP / DEST	OTP - BLQ
+W4 3139
+M1GUESTSON/ALEX VGKIXP OTPBLQW4 3139 172Y011D0083 100	Flight number
+OLCI / CHKS
+Flight date	21 / Jun / 2025
+FLIGHT DATE: 21 / JUN / 2025
+BUCHAREST OTOPENI
+Flight number	Gate closes	Departure
+W4 3139	12:00	12:30
+CHECKED-IN
+FREE CARRY-ON BAG
+BAGGAGE
+1 Free carry-on bag
+Seat
+40 x 30 x 20 cm
+11D
+PLEASE BOARD USING	None
+*Please note that passengers without WIZZ Priority showing up
+FRONT DOOR
+with a larger carry-on bag (40×30×20cm) at the boarding gate
+will need to pay an extra fee for oversized
+Arrival:
+BOLOGNA
+13:45
+-------------------------------------------------------------------------------l-------------------------------------------------------------------------------
+Have your boarding card with you.	Show your boarding card to the cabin crew when getting on the
+plane.
+ARRIVE AT THE AIRPORT	SECURITY CHECK	GATE CLOSES
+10:00	11:00	12:05
+GATE	PLANE DEPARTS
+11:50	12:30
+Your bag size will be checked at the gate. Have your	Flight time: 02:15
+boarding card and travel document ready for inspection.
+-----------------------------------------------------------------------------------------------------------------------------------------------------�----
+Name	Destination	Flight number	Date	Departure time	Services	Seq. no	Seat
+Alex Guestson	BLQ	W4 3139	21 Jun 2025	12:30	0083	11D

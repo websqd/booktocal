@@ -1,0 +1,64 @@
+Dành cho Hãng / Airline's copy
+Tên khách / Name	Mã đặt chỗ / Booking no.	Số hiệu chuyến bay / Flight No:
+VJ326
+WMKRNA
+Cửa khởi hành / Gate
+GUESTSON / ALEX JORDAN
+Giờ ra máy bay / Boarding time
+Từ / From (PQC) Phu Quoc - 14:20	Đến / To (SGN) Ho Chi Minh -
+13:50
+15:20
+Số ghế / Seat
+Seq #: 30
+Ngày / Date 23 Nov 2026	28D
+Requests: Eco1
+SSR Codes:
+BOARDING GROUP:	3
+THẺ LÊN TÀU / BOARDING PASS
+Dành cho Khách / Passenger's Copy
+Tên khách / Name	Số hiệu chuyến bay / Flight No:
+VJ326
+Cửa khởi hành / Gate
+GUESTSON / ALEX JORDAN
+Giờ ra máy bay / Boarding time
+Từ / From (PQC) Phu Quoc - 14:20	13:50
+Số ghế / Seat
+Ngày / Date 23 Nov 2026	Seq #: 30	28D
+Requests: Eco1
+SSR Codes:
+BOARDING GROUP:
+3
+***LƯU Ý / REMINDER***
+Quầy làm thủ tục chuyến bay QUỐC NỘI đóng và không nhận khách tại 40 phút trước giờ khởi hành.
+Check-in counters close 40 minutes prior to departure of all DOMESTIC flights.
+Quầy làm thủ tục chuyến bay QUỐC TẾ đóng và không nhận khách tại 50 phút trước giờ khởi hành.
+Check-in counters close 50 minutes prior to departure of all INTERNATIONAL flights.
+CÁC BƯỚC THỰC HIỆN TẠI SÂN BAY / YOUR NEXT STEPS
+BƯỚC STEP 1	BƯỚC STEP 2	BƯỚC STEP 3	BƯỚC STEP 4
+CÓ HÀNH LÝ KÝ GỬI	KHÔNG HÀNH LÝ KÝ GỬI	AN NINH SOI	CỬA KHỞI HÀNH	ĐÓNG CỬA KHỞI HÀNH
+WITH CHECKED BAG	WITHOUT CHECKED BAG	CHIẾU	BOARDING GATE	GATE CLOSING TIME
+SECURITY
+Liên hệ quầy làm thủ tục	Di chuyển đến khu vực	Có mặt tại cửa khởi	Cửa khởi hành sẽ đóng 15 phút
+an ninh soi chiếu	hành tối thiểu 30 phút
+trước giờ khởi hành. Khách sẽ
+Go to check-in counter to	trước giờ khởi hành
+không được phép lên máy bay khi
+drop bag	Proceed to security area	Be at the gate not later
+cửa khởi hành đã đóng.
+than 30 minutes before
+Boarding gate closes at 15
+the departure time
+minutes prior to departure. You will
+be denied boarding once gate
+closes.
+CHỈ 1 KIỆN DUY NHẤT
+Tối đa 7 KG.	Kích thước 56cm x 36cm x 23cm	HÀNH LÝ
+1 CABIN BAG ONLY
+XÁCH TAY
+Maximum 7 Kgs.	Size 56cm x 36cm x 23cm
+•	Lịch bay có thể thay đổi và/hoặc hủy, dừng, chuyển hướng, hoãn, thay đổi giờ khởi hành hoặc chậm bất kì chuyến bay nào
+quí khách đã làm thủ tục trực tuyến căn cứ trên những trường hợp có lí do chính đáng nằm ngoài sự kiểm soát của Hãng
+hoặc các lí do liên quan đến an toàn, thương mại.
+•	At any time after you have checked-in, we may change our schedule and/or cancel, terminate, divert, postpone, reschedule or
+delay any flight where we reasonably consider this to be justified by circumstances beyond our control or for reasons of safety
+or commercial reasons.

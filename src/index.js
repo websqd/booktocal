@@ -175,8 +175,10 @@ function csp(nonce) {
     "default-src 'self'; " +
     "script-src 'self' 'nonce-" + nonce + "'; " +
     "style-src 'self' 'unsafe-inline'; " +
-    "img-src 'self' data:; " +
+    "img-src 'self' data: blob:; " +
     "connect-src 'self'; " +
+    // pdf.js and the OCR engine run in same-origin workers under /vendor/.
+    "worker-src 'self'; " +
     "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
   );
 }

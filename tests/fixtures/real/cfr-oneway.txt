@@ -1,0 +1,23 @@
+Bilet / Ticket Id: 30000002
+Numărul de călători
+1
+Number of passengers
+BILET / TICKET
+Data cumpărării / Buy date
+23 Jul 2026
+Trenuri / Trains
+Plecare / Departure	Sosire / Arrival
+București Nord	Piatra Neamț
+25 Jul 2026	14:12	20:25	25 Jul 2026
+Tren / Train	Vagon / Car	Locuri / Places	Clasa a 2-a	110.5 Lei + 11.5
+IR 1655, R 5481	5	87	2nd class	Lei
+Pasageri / Passengers
+Bilete pentru / Tickets for	Date bilete / Tickets data
+Adulți / Adults = 1	Alex Guestson
+Preț / Price
+Preț întreg / Full price	122.0 Lei
+Reduceri comerciale / Commercial discounts	0.0 Lei
+Preț online / Online price	122.0 Lei
+TVA / VAT	21.17 Lei
+Biletul este valabil respectând termenii și condițiile. The ticket is valid according to the terms and conditions!
+https://bilete.cfrcalatori.ro/Home/TermsConditions

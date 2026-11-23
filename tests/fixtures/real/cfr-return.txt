@@ -1,0 +1,30 @@
+Bilet / Ticket Id: 30000001
+Numărul de călători
+1
+BILET / TICKET
+Number of passengers
+dus-întors / return
+Data cumpărării / Buy date
+24 Sep 2026
+Trenuri / Trains
+Plecare / Departure	Sosire / Arrival
+București Nord	Piatra Neamț
+27 Sep 2026	15:00	21:11	27 Sep 2026
+Tren / Train	Vagon / Car	Locuri / Places	Clasa a 2-a
+110.45 Lei
+IR 1657	4	86	2nd class
+Plecare / Departure	Sosire / Arrival
+29 Sep 2026	09:28	Piatra Neamț	București Nord	15:25	29 Sep 2026
+Tren / Train	Vagon / Car	Locuri / Places	Clasa a 2-a
+110.45 Lei
+IR 1858	5	42	2nd class
+Pasageri / Passengers
+Bilete pentru / Tickets for	Date bilete / Tickets data
+Adulți / Adults = 1	Alex Guestson
+Preț / Price
+Preț întreg / Full price	244.00 Lei
+Reduceri comerciale / Commercial discounts	23.10 Lei
+Preț online / Online price	220.90 Lei
+TVA / VAT	38.34 Lei
+Biletul este valabil respectând termenii și condițiile. The ticket is valid according to the terms and conditions!
+https://bilete.cfrcalatori.ro/Home/TermsConditions
