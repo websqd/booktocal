@@ -3,3 +3,4 @@ node_modules/
 .wrangler/
 _plans/
 .DS_Store
+tests/fixtures/private/
