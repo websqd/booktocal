@@ -239,6 +239,11 @@ var BTCParser = (function () {
   const RE_TIME_AMPM = /(?<![\d:])([01]?\d|2[0-3])(?:[:.]([0-5]\d))?\s?([ap])\.?\s?m\.?(?![a-z])/gi;
   const RE_TIME_24H = /(?<![\d:])([01]?\d|2[0-3])[:∶]([0-5]\d)(?::[0-5]\d)?(?![\d:])/g;
   const RE_TIME_H = /(?<![\d:])([01]?\d|2[0-3])h([0-5]\d)(?![\dm])/g;
+  // "19.30 Uhr" / "ore 19.30" / "at 19.30": a dot only counts next to a time word.
+  const RE_TIME_DOT = /(?<![\d:.,/])([01]?\d|2[0-3])\.([0-5]\d)(?![\d:.,/])/g;
+  const RE_DOT_BEFORE = /(?:\b(?:um|at|ore|alle|ora|kl\.?|a las|as)|[àa]s|à)\s*$/i;
+  const RE_DOT_AFTER = /^\s?(?:uhr|hrs?|h|ore|o'clock)\b/i;
+  const RE_NOT_A_TIME = /^\s?(?:eur|usd|gbp|ron|lei|chf|kg|km|mb|gb|%|€|\$|£)/i;
   // "Flight time: 02:15" and "Duration 1:30" are lengths, not clock times.
   const RE_DURATION_LABEL = /(?:flight time|duration|durata|dur[ée]e|journey time|travel time|total time)\s*:?\s*$/i;
 
@@ -246,7 +251,9 @@ var BTCParser = (function () {
     const out = [];
     const add = (m, hh, mm) => {
       if (RE_DURATION_LABEL.test(line.slice(0, m.index))) return;
-      out.push({ index: m.index, end: m.index + m[0].length, hh: hh, mm: mm, key: pad2(hh) + ':' + pad2(mm) });
+      // "19:30 Uhr": the unit belongs to the time, not to the title.
+      const unit = line.slice(m.index + m[0].length).match(/^\s?(?:uhr|hrs)\b/i);
+      out.push({ index: m.index, end: m.index + m[0].length + (unit ? unit[0].length : 0), hh: hh, mm: mm, key: pad2(hh) + ':' + pad2(mm) });
     };
     let m;
     const ap = new RegExp(RE_TIME_AMPM.source, 'gi');
@@ -262,6 +269,12 @@ var BTCParser = (function () {
     while ((m = h24.exec(line))) add(m, Number(m[1]), Number(m[2]));
     const hh = new RegExp(RE_TIME_H.source, 'g');
     while ((m = hh.exec(line))) add(m, Number(m[1]), Number(m[2]));
+    const dot = new RegExp(RE_TIME_DOT.source, 'g');
+    while ((m = dot.exec(line))) {
+      const after = line.slice(m.index + m[0].length);
+      if (RE_NOT_A_TIME.test(after)) continue;
+      if (RE_DOT_AFTER.test(after) || RE_DOT_BEFORE.test(line.slice(0, m.index))) add(m, Number(m[1]), Number(m[2]));
+    }
     out.sort((a, b) => a.index - b.index || b.end - a.end);
     const kept = [];
     for (const t of out) if (!kept.length || t.index >= kept[kept.length - 1].end) kept.push(t);
@@ -563,7 +576,16 @@ var BTCParser = (function () {
       // A neighbouring line that is itself another dated leg does not lend its
       // keyword ("Return train ..." above "Outbound flight ...").
       if (L[j].dates.length && /\bflight\b|\bflt\b/i.test(L[i].text + L[j].text)) continue;
-      for (const g of GROUND) if (g.re.test(L[j].text)) return g;
+      for (const g of GROUND) {
+        if (!g.re.test(L[j].text)) continue;
+        // "Airport bus transfer included" under a flight row is not a bus trip:
+        // a flight number at least as close as the keyword keeps the line.
+        const reach = Math.abs(j - i);
+        for (let k = Math.max(0, i - reach); k <= Math.min(L.length - 1, i + reach); k++) {
+          if (!GROUND.some((x) => x.re.test(L[k].text)) && flightCodes(doc, k).length) return null;
+        }
+        return g;
+      }
     }
     return null;
   }
@@ -633,6 +655,12 @@ var BTCParser = (function () {
     const station = (s) => clean(clean(s.replace(/^.*\bfrom\b/i, ''))
       .replace(/^(?:your\s+)?(?:e-?ticket|train|rail|bus|coach|ferry|tren|zug|treno|autobus)\b(?:\s+(?:ticket|booking|reservation|journey|trip))?\s*[:\-–]?\s*/i, '')
       .replace(/^[A-Z]{1,3}\s?\d{1,5}\b\s*[:\-–]?\s*(?=\S)/, ''));
+    // "13 Dec 2026 08:00 London → Oxford": the date and time are not the station.
+    const noWhen = (t) => {
+      for (const d of findDates(t, doc.ctx).reverse()) t = t.slice(0, d.index) + ' ' + t.slice(d.end);
+      for (const x of findTimes(t).reverse()) t = t.slice(0, x.index) + ' ' + t.slice(x.end);
+      return t;
+    };
     // "A → B" on the line or just around it.
     for (const j of [i, i - 1, i + 1, i - 2]) {
       if (j < 0 || j >= L.length) continue;
@@ -640,7 +668,7 @@ var BTCParser = (function () {
       for (const part of parts) {
         const m = part.split(ARROW);
         if (m.length === 2 && m[0] && m[1]) {
-          return { from: station(m[0]), to: clean(m[1]), firstLine: Math.min(i, j) };
+          return { from: station(noWhen(m[0])), to: clean(noWhen(m[1])), firstLine: Math.min(i, j) };
         }
         const ft = part.match(/\bfrom\s+(.{2,40}?)\s+to\s+(.{2,40}?)(?:\s+on\b|\s+at\b|[,.;]|$)/i);
         if (ft) return { from: clean(ft[1]), to: clean(ft[2]), firstLine: Math.min(i, j) };
@@ -1412,7 +1440,16 @@ var BTCParser = (function () {
     for (let i = 0; i < L.length; i++) {
       const line = L[i];
       if (line.used || line.junk || !line.dates.length) continue;
-      const date = line.dates[0];
+      let date = line.dates[0];
+      let second = line.dates[1] || null;
+      // "10 - 12 Dec 2026": the first day of a range stands in front of the date.
+      const lead = second ? null : line.text.slice(0, date.index).match(/(?<![\d:.,/])(0?[1-9]|[12]\d|3[01])(?:st|nd|rd|th)?\.?\s?(?:-|–|—|to|bis|au|al)\s?$/i);
+      const ranged = !!lead && Number(lead[1]) < date.d && !flightCodes(doc, i).length;
+      if (ranged) {
+        second = date;
+        date = Object.assign({}, date, { d: Number(lead[1]) });
+        second.index = lead.index; // so the title drops the whole range
+      }
       let time = nearestTime(line, date);
       if (!time) {
         for (let j = i + 1; j <= Math.min(i + 3, L.length - 1) && !time; j++) {
@@ -1423,8 +1460,7 @@ var BTCParser = (function () {
       if (doc.typed && !time) continue;
       const title = lineTitle(doc, i);
       const location = nearbyLabel(doc, i, /venue|address|location|where/i);
-      const second = line.dates[1] || null;
-      const endTime = second ? nearestTime(line, second) : (time ? line.times.find((t) => t !== time && t.index > time.index) : null);
+      const endTime = second && !ranged ? nearestTime(line, second) : (time ? line.times.find((t) => t !== time && t.index > time.index) : null);
       const around = L.slice(Math.max(0, i - 3), Math.min(L.length, i + 4)).map((x) => x.text).join(' ');
       events.push(mkEvent({
         type: 'event',
@@ -1432,6 +1468,8 @@ var BTCParser = (function () {
         title: title,
         location: location,
         tz: G.tzFromText(line.text + ' ' + location),
+        // Several days and no clock time at all: a banner, not a 12:00 block.
+        allDay: !!second && dateKey(second) > dateKey(date) && !time && !endTime,
         start: startOf(date, time),
         end: second ? { date: dateKey(second), time: endTime ? endTime.key : null, dateExplicit: true }
           : endTime ? { date: dateKey(date), time: endTime.key } : null,
@@ -1472,7 +1510,8 @@ var BTCParser = (function () {
       // Cutting "10 Dec 2026, 2pm - 5pm" out of a line leaves its punctuation behind.
       .replace(/\s*(?:[,;|·•\-–—]\s*){2,}/g, ', ')
       .replace(/([:(])\s*,\s*/g, '$1 ')
-      .replace(/(?:^|\s)(?:at|on|um|am|the)\s*$/i, '')
+      .replace(/\s+([,;])/g, '$1')
+      .replace(/(?:^|\s)(?:at|on|um|am|the|ore|alle|kl\.?)\s*$/i, '')
       .replace(/^[\s,:;|·•()\-–—]+|[\s,:;|·•()\-–—]+$/g, '')
       .replace(/\s+(?:at|on|departs?|arrives?)$/i, '')
       .replace(/\s+(?:at|on)$/i, '')

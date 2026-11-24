@@ -54,6 +54,7 @@ npm run build:airports         # regenerate public/vendor/airports.js
   `fixtures/real/*.txt` are PDF extractions (tabs = table columns), OCR output
   (`ocr-*`) and pastes (`paste-*`). `fixtures/private/` is gitignored: real,
   unanonymized documents go there and nowhere else.
+- `.github/workflows/test.yml` — CI: `npm ci && npm test` on push and PR.
 - `_plans/` — bigtask plan files (gitignored).
 
 ## Event shape
@@ -106,6 +107,21 @@ npm run build:airports         # regenerate public/vendor/airports.js
   call `renderEvents()` from a field handler: it replaces the input being
   typed in. Only the all-day switch rebuilds the form.
 - ICS UIDs are stable (`uidOf`: type + number or title + start date).
+- Safari has no `for await` over a ReadableStream; pdf.js needs it. The
+  shim at the top of extract.js supplies it (tests/extract.test.mjs checks
+  it). Keep it when you refresh pdf.js, and run /iostest after a refresh.
+- iOS rules live in the `@media (pointer: coarse)` block of ui.js: fields at
+  16px (smaller text makes Safari zoom), date/time fields `appearance: none`
+  (else they overflow), 44px text links. Never add HEIC to
+  `BTCIntake.ACCEPT`: iOS stops converting photos to JPEG.
+- Date/time fields: Chrome sends `change` per keystroke and an empty value
+  for a half-typed segment. The handler ignores empty values; `focusout`
+  restores a date and removes a time.
+- Colours: readable text uses `--text-secondary`; `--text-muted` is only for
+  placeholders and disabled buttons. Coloured text on its own tint mixes the
+  colour with `--text-primary` (badges, warn chips).
+- Two `wrangler dev` at once: give the second `--inspector-port 9230` and
+  `--persist-to <dir>`, else it dies on port 9229 or a locked SQLite file.
 - Settings (targets, emoji, hotel all-day, default time/duration,
   no-time→all-day) persist in localStorage `btcSettings`.
 - When adding a pattern: add a fixture (anonymize names, references, emails,
@@ -116,11 +132,12 @@ npm run build:airports         # regenerate public/vendor/airports.js
   worker compiles WebAssembly).
 - Deploy: `wrangler deploy`; secrets via `wrangler secret put UNLOCK_CODE`.
   `PAYMENT_LINK` is a plain var in wrangler.jsonc (empty until Stripe exists).
+  The rate limiter is the `ratelimits` key (also works in local dev).
 
 ## Verify
 
 - After parser/geo/ics/intake changes: `npm test`.
 - After ui.js changes: syntax-check the inline script —
-  `node --input-type=module -e "import {appPage} from './src/ui.js'; new Function(appPage('n','').match(/<script nonce=\"n\">([\s\S]*?)<\/script>/)[1])"`
+  `node --input-type=module -e "import {appPage} from './src/ui.js'; for (const m of appPage('n','').matchAll(/<script nonce=\"n\">([\s\S]*?)<\/script>/g)) new Function(m[1])"`
   — and load `/` locally (`npm run dev`), convert a PDF and a screenshot.
 - `curl -sI localhost:8787` (HEAD) returns hardened 404 — CSP is on `GET /`.

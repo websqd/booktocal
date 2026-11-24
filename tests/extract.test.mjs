@@ -39,4 +39,23 @@ assert.equal(ev.meta.checkIn, '15:00');
 assert.equal(ev.end.date, '2026-09-06');
 assert.match(ev.title, /Grand Hotel Plaza|Hotel/i);
 
+// Safari cannot iterate a ReadableStream with "for await"; extract.js must fill
+// the gap or every PDF fails there.
+const key = Symbol.asyncIterator;
+const native = Object.getOwnPropertyDescriptor(ReadableStream.prototype, key);
+delete ReadableStream.prototype[key];
+try {
+  assert.equal(ReadableStream.prototype[key], undefined, 'the native iterator is gone for this check');
+  const safari = loadVendor();
+  assert.equal(typeof ReadableStream.prototype[key], 'function', 'extract.js installs the iterator');
+  const again = await safari.BTCExtract.extractPdfText(pdfjs, new Uint8Array(readFileSync(here('fixtures/booking.pdf'))), workerUrl);
+  assert.equal(again, text, 'same text without the native stream iterator');
+  // An early exit from the loop releases the stream.
+  const stream = new ReadableStream({ start(c) { c.enqueue(1); c.enqueue(2); c.close(); } });
+  for await (const v of stream) { assert.equal(v, 1); break; }
+  assert.equal(stream.locked, false);
+} finally {
+  Object.defineProperty(ReadableStream.prototype, key, native);
+}
+
 console.log('PDF extraction test passes — event:', ev.type, ev.start.date, '→', ev.end.date, '|', ev.title);

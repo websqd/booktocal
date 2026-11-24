@@ -14,6 +14,7 @@ export function appPage(nonce, payLink) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BookToCal — bookings to calendar events</title>
 <meta name="description" content="Drop flight, train, hotel or ticket confirmations — PDFs, screenshots, emails or pasted text — and get Google / Apple / Outlook calendar events with the right local times. Everything is read in your browser.">
+<script nonce="${nonce}">try{var t=localStorage.getItem('btcTheme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='3'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4'/%3E%3C/svg%3E">
 <style>${css()}</style>
 </head>
@@ -134,7 +135,8 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
     <p class="hint">Which buttons appear on each event.</p>
     <label class="check-row"><input type="checkbox" data-target="google" checked> <span>Google Calendar <span class="tag">default</span></span></label>
     <label class="check-row"><input type="checkbox" data-target="apple" checked> <span>Apple Calendar <span class="hint-inline">(.ics file)</span></span></label>
-    <label class="check-row"><input type="checkbox" data-target="outlook"> <span>Outlook</span></label>
+    <label class="check-row"><input type="checkbox" data-target="outlook"> <span>Outlook.com <span class="hint-inline">(personal)</span></span></label>
+    <label class="check-row"><input type="checkbox" data-target="outlookWork"> <span>Outlook 365 <span class="hint-inline">(work or school)</span></span></label>
     <label class="check-row"><input type="checkbox" data-target="yahoo"> <span>Yahoo</span></label>
     <label class="check-row"><input type="checkbox" data-target="ics" checked> <span>.ics file</span></label>
   </div>
@@ -198,7 +200,7 @@ var FREE_LIMIT = 3;
 var GATE_ON = !!PAY_LINK;
 
 var SETTING_DEFAULTS = {
-  targets: { google: true, apple: true, outlook: false, yahoo: false, ics: true },
+  targets: { google: true, apple: true, outlook: false, outlookWork: false, yahoo: false, ics: true },
   defaultTime: '12:00',
   defaultDuration: 30,
   noTimeAllDay: false,
@@ -252,12 +254,7 @@ function setEmoji(on){
   qs(id).addEventListener('change', function(){ setEmoji(this.checked); });
 });
 
-// --- theme ---------------------------------------------------------------
-(function initTheme(){
-  var t = 'dark';
-  try { t = localStorage.getItem(THEME_KEY) || 'dark'; } catch(e){}
-  document.documentElement.setAttribute('data-theme', t);
-})();
+// --- theme (the stored choice is applied by the script in <head>) ---------
 qs('#theme-btn').addEventListener('click', function(){
   var t = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', t);
@@ -523,6 +520,7 @@ async function convertNow(){
         onProgress: (function(item){ return function(msg){ item.note = msg; var el = qs('[data-file="' + item.id + '"] .file-note'); if (el) el.textContent = msg; }; })(p)
       });
       docs = docs.concat(out);
+      out.forEach(function(d){ if (d.note) problems.push({ kind: 'warning', text: d.name + ': ' + d.note }); });
       p.status = 'done'; p.note = '';
     } catch(e){
       p.status = 'error';
@@ -772,7 +770,7 @@ function eventCard(ev, i){
 // it gets an .ics download. Google gets an extra copy-link button so the
 // prefilled link can be shared.
 function cardButtons(){
-  var defs = { google: 'Google', apple: 'Apple', outlook: 'Outlook', yahoo: 'Yahoo', ics: '.ics file' };
+  var defs = { google: 'Google', apple: 'Apple', outlook: 'Outlook', outlookWork: 'Outlook 365', yahoo: 'Yahoo', ics: '.ics file' };
   var out = '<span class="field-label">Add to</span>';
   var any = false;
   for (var t in defs){
@@ -870,6 +868,8 @@ qs('#event-list').addEventListener('change', function(e){
   if (!c || !c.ev) return;
   var field = inp.getAttribute('data-field');
   if (field === 'title' || field === 'location'){ refreshCard(c.card, c.ev); return; } // value set on input
+  // A half-typed date or time ("0_" in the month) reads as empty: wait for the rest.
+  if (!inp.value && (inp.type === 'date' || inp.type === 'time')) return;
   applyField(c.ev, field, inp);
   // The all-day switch changes which fields the form has. Everything else
   // updates in place, so the input being typed in keeps the focus.
@@ -880,6 +880,16 @@ qs('#event-list').addEventListener('change', function(e){
   } else {
     refreshCard(c.card, c.ev);
   }
+});
+
+// A date or time left empty: the date goes back to its last value, the time is removed.
+qs('#event-list').addEventListener('focusout', function(e){
+  var inp = e.target.closest('input[data-field]');
+  if (!inp || inp.value || (inp.type !== 'date' && inp.type !== 'time')) return;
+  var c = cardEvent(inp);
+  if (!c || !c.ev) return;
+  if (inp.type === 'time') applyField(c.ev, inp.getAttribute('data-field'), inp);
+  refreshCard(c.card, c.ev);
 });
 
 function refreshCard(card, ev){
@@ -973,6 +983,7 @@ function plusMinutes(hhmm, mins){
 function exportEvent(target, ev){
   if (target === 'google'){ window.open(BTCCal.googleUrl(ev, settings), '_blank', 'noopener'); return; }
   if (target === 'outlook'){ window.open(BTCCal.outlookUrl(ev, settings), '_blank', 'noopener'); return; }
+  if (target === 'outlookWork'){ window.open(BTCCal.outlookUrl(ev, settings, true), '_blank', 'noopener'); return; }
   if (target === 'yahoo'){ window.open(BTCCal.yahooUrl(ev, settings), '_blank', 'noopener'); return; }
   // apple + ics both download .ics (Apple Calendar has no web prefill URL).
   BTCCal.downloadIcs([ev], settings, slug(ev.title) + '.ics');
@@ -1077,7 +1088,7 @@ body {
   min-height: 100vh;
 }
 .mono { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; }
-.muted { color: var(--text-muted); }
+.muted { color: var(--text-secondary); }
 
 /* ambient backdrop: two slow-drifting accent glows */
 .aurora {
@@ -1117,6 +1128,7 @@ body {
   display: inline-flex; align-items: center; gap: 10px;
   background: none; border: 0; padding: 4px; cursor: pointer;
   color: var(--text-primary); font: inherit; border-radius: 8px;
+  min-height: 44px;
 }
 .logo {
   display: inline-flex; align-items: center; justify-content: center;
@@ -1134,7 +1146,7 @@ body {
   background: var(--surface-hover); color: var(--text-secondary);
   border: 1px solid var(--border-default); white-space: nowrap;
 }
-.counter.low { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); border-color: transparent; }
+.counter.low { background: color-mix(in srgb, var(--warning) 14%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); border-color: transparent; }
 .counter.unlimited { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); border-color: transparent; font-size: 15px; }
 
 .icon-btn {
@@ -1170,8 +1182,8 @@ main {
   font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--text-secondary); margin: 0 0 4px;
 }
-.hint { font-size: 13px; color: var(--text-muted); margin: 0 0 12px; }
-.hint-inline { font-size: 12px; color: var(--text-muted); }
+.hint { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; }
+.hint-inline { font-size: 12px; color: var(--text-secondary); }
 
 /* --- inputs ---------------------------------------------------------------- */
 .input {
@@ -1203,7 +1215,7 @@ main {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   padding: 12px 16px; border-top: 1px solid var(--border-default);
 }
-.composer-hint { font-size: 13px; color: var(--text-muted); flex: 1 1 220px; }
+.composer-hint { font-size: 13px; color: var(--text-secondary); flex: 1 1 220px; }
 .drop-veil {
   position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
   border-radius: 16px; font-weight: 600; color: var(--accent); pointer-events: none;
@@ -1250,7 +1262,7 @@ main {
 }
 .privacy-note {
   display: flex; align-items: center; gap: 6px;
-  margin: 24px 0 0; font-size: 13px; color: var(--text-muted);
+  margin: 24px 0 0; font-size: 13px; color: var(--text-secondary);
 }
 
 /* --- buttons ---------------------------------------------------------------- */
@@ -1317,15 +1329,16 @@ main {
 }
 .ev-tools { display: flex; gap: 2px; margin: -8px -8px 0 0; }
 .ev-del:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
+/* Badge and chip text: the type colour mixed with the text colour, so it stays readable on its tint. */
 .badge {
   display: inline-block; font-size: 12px; font-weight: 500; padding: 2px 8px;
   border-radius: 9999px; white-space: nowrap;
 }
-.badge.type-flight { background: color-mix(in srgb, var(--info) 13%, transparent); color: var(--info); }
-.badge.type-hotel { background: color-mix(in srgb, var(--success) 13%, transparent); color: var(--success); }
-.badge.type-train, .badge.type-bus, .badge.type-ferry { background: color-mix(in srgb, var(--warning) 15%, transparent); color: var(--warning); }
-.badge.type-deadline { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
-.badge.type-event { background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent); }
+.badge.type-flight { background: color-mix(in srgb, var(--info) 13%, transparent); color: color-mix(in srgb, var(--info) 55%, var(--text-primary)); }
+.badge.type-hotel { background: color-mix(in srgb, var(--success) 13%, transparent); color: color-mix(in srgb, var(--success) 55%, var(--text-primary)); }
+.badge.type-train, .badge.type-bus, .badge.type-ferry { background: color-mix(in srgb, var(--warning) 15%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); }
+.badge.type-deadline { background: color-mix(in srgb, var(--danger) 12%, transparent); color: color-mix(in srgb, var(--danger) 55%, var(--text-primary)); }
+.badge.type-event { background: color-mix(in srgb, var(--accent) 13%, transparent); color: color-mix(in srgb, var(--accent) 55%, var(--text-primary)); }
 
 .ev-when { margin-top: 16px; }
 .when-line { margin: 0; font-size: 16px; font-variant-numeric: tabular-nums; }
@@ -1340,11 +1353,11 @@ main {
 .leg-time.approx { color: var(--text-secondary); }
 .leg-place { font-size: 14px; overflow-wrap: anywhere; }
 .leg-place .code {
-  font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; color: var(--text-secondary);
+  font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; color: color-mix(in srgb, var(--text-secondary) 75%, var(--text-primary));
   padding: 1px 6px; border-radius: 4px; background: var(--surface-hover); white-space: nowrap;
 }
-.leg-date { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.leg-mid { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
+.leg-date { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.leg-mid { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
 .leg-rule { flex: 1 1 16px; height: 1px; background: var(--border-strong); }
 .leg-dur { font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
@@ -1354,9 +1367,9 @@ main {
   background: var(--surface-hover); color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.chip-label { color: var(--text-muted); }
-.chip.warn { background: color-mix(in srgb, var(--warning) 14%, transparent); color: var(--warning); cursor: help; }
-.chip.src { background: transparent; border: 1px solid var(--border-default); color: var(--text-muted); max-width: 240px; }
+.chip-label { color: color-mix(in srgb, var(--text-secondary) 75%, var(--text-primary)); }
+.chip.warn { background: color-mix(in srgb, var(--warning) 14%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); cursor: help; }
+.chip.src { background: transparent; border: 1px solid var(--border-default); color: var(--text-secondary); max-width: 240px; }
 
 .event-actions {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -1396,7 +1409,7 @@ main {
 .check-row input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
 .tag {
   font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 9999px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent); color: color-mix(in srgb, var(--accent) 55%, var(--text-primary));
 }
 .field-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
 .field-row label { color: var(--text-secondary); font-size: 14px; }
@@ -1444,7 +1457,7 @@ input[type="time"].input, input[type="number"].input { padding: 8px 10px; }
 /* --- footer ----------------------------------------------------------------------- */
 .foot {
   max-width: 880px; margin: 0 auto; padding: 24px 32px 48px;
-  color: var(--text-muted); font-size: 13px;
+  color: var(--text-secondary); font-size: 13px;
 }
 
 /* --- responsive -------------------------------------------------------------------- */
@@ -1467,6 +1480,18 @@ input[type="time"].input, input[type="number"].input { padding: 8px 10px; }
   .leg-mid .leg-rule:last-child { display: none; }
   .results-actions { width: 100%; justify-content: space-between; }
   .results-foot .btn { flex: 1 1 auto; }
+}
+
+/* iOS Safari zooms the whole page when a focused field has text under 16px. */
+@media (pointer: coarse) {
+  input, textarea, select { font-size: 16px !important; }
+  /* iOS sizes date and time fields as content-box and centres their text. */
+  input[type="date"].input, input[type="time"].input {
+    -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; min-height: 45px;
+  }
+  input::-webkit-date-and-time-value { text-align: left; }
+  /* Text links need a 44px touch target. */
+  .link-btn { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
 /* --- focus & a11y ------------------------------------------------------------------- */

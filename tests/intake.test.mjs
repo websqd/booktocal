@@ -132,6 +132,21 @@ await check('unzip reads stored and deflated entries', async () => {
   await assert.rejects(() => unzip(enc('not a zip, definitely not one')));
 });
 
+await check('htmlToText keeps "<" and ">" written in prose', () => {
+  assert.equal(htmlToText('<p>Bags < 10 kg are free. Flight BA 11 departs > 2h later</p><o:p>x</o:p><!DOCTYPE html><p>Next</p>'),
+    'Bags < 10 kg are free. Flight BA 11 departs > 2h later\nx\nNext');
+});
+
+await check('parseEml keeps the body of a part that has no headers', () => {
+  const eml = ['Subject: S', 'Content-Type: multipart/mixed; boundary="q"', '', '--q', '', 'Hotel Europa Rome ' + 'y'.repeat(220), '--q--', ''].join('\r\n');
+  assert.match(parseEml(enc(eml)).text, /Hotel Europa Rome/);
+});
+
+await check('HEIC photos count as images by extension', () => {
+  assert.equal(kindOf({ name: 'IMG_0001.HEIC', type: '' }), 'image');
+  assert.ok(!/hei[cf]/i.test(V.BTCIntake.ACCEPT), 'iOS converts HEIC to JPEG only while the accept list has no HEIC');
+});
+
 await check('unzip refuses entries that inflate past the cap', async () => {
   const big = new Uint8Array(6 * 1024 * 1024); // deflates to a few KB
   const honest = await unzip(new Uint8Array(zip([['big.json', big, true], ['a.txt', enc('ok'), false]])));

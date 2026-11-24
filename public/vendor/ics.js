@@ -3,6 +3,7 @@
 //   BTCCal.titleOf(ev, settings)        title with the emoji prefix when enabled
 //   BTCCal.describe(ev)                 plain-text description built from ev.meta
 //   BTCCal.googleUrl / outlookUrl / yahooUrl (ev, settings)
+//   BTCCal.outlookUrl(ev, settings, true)   Microsoft 365 work/school accounts
 //   BTCCal.icsFor(events, settings) -> RFC 5545 string
 //   BTCCal.downloadIcs(events, settings, filename)
 //
@@ -296,7 +297,8 @@ var BTCCal = (function () {
       (ev.location ? '&location=' + enc(ev.location) : '');
   }
 
-  function outlookUrl(ev, settings) {
+  // `work`: Microsoft 365 work and school accounts use another host and path.
+  function outlookUrl(ev, settings, work) {
     var r = resolve(ev, settings);
     var startdt, enddt;
     if (r.allDay) {
@@ -309,8 +311,8 @@ var BTCCal = (function () {
       startdt = r.start.date + 'T' + r.start.time + ':00';
       enddt = r.end.date + 'T' + r.end.time + ':00';
     }
-    return 'https://outlook.live.com/calendar/0/deeplink/compose' +
-      '?path=/calendar/action/compose&rru=addevent' +
+    return (work ? 'https://outlook.office.com/calendar/action/compose?rru=addevent'
+      : 'https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent') +
       '&subject=' + enc(titleOf(ev, settings)) +
       '&startdt=' + enc(startdt) +
       '&enddt=' + enc(enddt) +

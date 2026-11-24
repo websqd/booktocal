@@ -3,8 +3,9 @@
 // file is uploaded anywhere.
 //
 //   BTCIntake.kindOf(file)            'pdf' | 'image' | 'eml' | 'html' | 'pkpass' | 'text' | null
-//   BTCIntake.read(file, env)         -> Promise<[{ name, text }]>  (an email can
-//                                        yield several documents: body + attachments)
+//   BTCIntake.read(file, env)         -> Promise<[{ name, text, note? }]>  (an email
+//                                        can yield several documents: body +
+//                                        attachments; note = a warning to show)
 //   env: { pdfjs: () => Promise<pdf.js module>, onProgress(message) }
 //
 // The pure converters (htmlToText, parseEml, unzip, passToText) have no DOM
@@ -21,7 +22,7 @@ var BTCIntake = (function () {
     if (/\.pkpass$/.test(name) || type === 'application/vnd.apple.pkpass') return 'pkpass';
     if (/\.eml$/.test(name) || type === 'message/rfc822') return 'eml';
     if (/\.html?$/.test(name) || type === 'text/html') return 'html';
-    if (/^image\//.test(type) || /\.(png|jpe?g|webp|gif|bmp)$/.test(name)) return 'image';
+    if (/^image\//.test(type) || /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/.test(name)) return 'image';
     if (/^text\//.test(type) || /\.(txt|text|md|csv)$/.test(name)) return 'text';
     return null;
   }
@@ -62,7 +63,8 @@ var BTCIntake = (function () {
       .replace(/<\/(?:td|th)\s*>/gi, '\t')
       .replace(/<\/(?:p|div|tr|li|h[1-6]|table|section|article|header|footer|blockquote|ul|ol|dd|dt)\s*>/gi, '\n')
       .replace(/<(?:p|div|tr|li|h[1-6]|table|hr)\b[^>]*>/gi, '\n')
-      .replace(/<[^>]+>/g, '');
+      // Only real tags: "Bags < 10 kg ... > 2h" is prose.
+      .replace(/<\/?[a-zA-Z!?][^>]*>/g, '');
     s = decodeEntities(s).replace(/[​‌‍﻿]/g, '');
     return s.split('\n')
       .map(function (line) { return line.replace(/[  ]+/g, ' ').replace(/ ?\t ?/g, '\t').replace(/^[\t ]+|[\t ]+$/g, ''); })
@@ -108,6 +110,9 @@ var BTCIntake = (function () {
   }
 
   function splitHeaders(raw) {
+    // A part that opens with a blank line has no headers: all of it is body.
+    var bare = raw.match(/^\r?\n/);
+    if (bare) return { headers: {}, body: raw.slice(bare[0].length) };
     var m = raw.match(/\r?\n\r?\n/);
     var head = m ? raw.slice(0, m.index) : raw;
     var body = m ? raw.slice(m.index + m[0].length) : '';
@@ -330,8 +335,14 @@ var BTCIntake = (function () {
     }
   }
 
-  async function ocrImage(blob, onProgress) {
-    var bitmap = await createImageBitmap(blob);
+  async function ocrImage(blob, onProgress, name) {
+    var bitmap;
+    try {
+      bitmap = await createImageBitmap(blob);
+    } catch (e) {
+      var heic = /hei[cf]/i.test(blob.type || '') || /\.hei[cf]$/i.test(name || '');
+      throw new Error(heic ? 'this browser cannot open HEIC photos; save the photo as JPEG or take a screenshot of it' : 'the image cannot be opened');
+    }
     try {
       return await ocrCanvas(upscale(bitmap, bitmap.width, bitmap.height), onProgress);
     } finally {
@@ -339,10 +350,14 @@ var BTCIntake = (function () {
     }
   }
 
+  var MAX_OCR_PAGES = 6;
+
   // Scanned PDFs have no text layer: render the pages and read them.
+  // -> { text, total: pages in the file, read: pages actually read }
   async function ocrPdf(pdfjs, bytes, onProgress) {
     var doc = await pdfjs.getDocument({ data: bytes }).promise;
-    var pages = Math.min(doc.numPages, 6);
+    var total = doc.numPages;
+    var pages = Math.min(total, MAX_OCR_PAGES);
     var text = [];
     for (var p = 1; p <= pages; p++) {
       var page = await doc.getPage(p);
@@ -354,7 +369,7 @@ var BTCIntake = (function () {
       text.push(await ocrCanvas(canvas, function (f) { if (onProgress) onProgress((p - 1 + f) / pages); }));
     }
     try { await doc.destroy(); } catch (e) {}
-    return text.join('\n');
+    return { text: text.join('\n'), total: total, read: pages };
   }
 
   async function releaseOcr() {
@@ -384,7 +399,7 @@ var BTCIntake = (function () {
     if (kind === 'pkpass') return [{ name: name, text: await readPass(bytes) }];
     if (kind === 'image') {
       progress('Reading image');
-      var text = await ocrImage(blob || new Blob([bytes]), function (f) { progress('Reading image ' + Math.round(f * 100) + '%'); });
+      var text = await ocrImage(blob || new Blob([bytes]), function (f) { progress('Reading image ' + Math.round(f * 100) + '%'); }, name);
       return [{ name: name, text: text }];
     }
     if (kind === 'pdf') {
@@ -394,7 +409,10 @@ var BTCIntake = (function () {
       var pdfText = await BTCExtract.extractPdfText(pdfjs, bytes.slice());
       if (pdfText.replace(/\s/g, '').length < 40 && typeof document !== 'undefined') {
         progress('Scanned PDF — reading pages');
-        pdfText = await ocrPdf(pdfjs, bytes.slice(), function (f) { progress('Reading pages ' + Math.round(f * 100) + '%'); });
+        var scanned = await ocrPdf(pdfjs, bytes.slice(), function (f) { progress('Reading pages ' + Math.round(f * 100) + '%'); });
+        var pdfDoc = { name: name, text: scanned.text };
+        if (scanned.read < scanned.total) pdfDoc.note = 'only the first ' + scanned.read + ' of ' + scanned.total + ' scanned pages were read';
+        return [pdfDoc];
       }
       return [{ name: name, text: pdfText }];
     }

@@ -340,5 +340,47 @@ check('generic title drops punctuation left by the date and time', () => {
   assert.equal(parseBooking('Workshop: 10 Dec 2026, 2pm - 5pm, Berlin', DEF).events[0].title, 'Workshop: Berlin');
 });
 
+// 27. A ground keyword near a flight row does not turn the flight into a bus
+check('flight stays a flight next to an airport-bus line', () => {
+  const a = parseBooking('Your itinerary\nBA 11 London (LHR) to Singapore (SIN)\nWed 25 Nov 2026 21:25 - 18:20\nSeat 24C\nAirport bus transfer to the terminal is included', DEF).events;
+  assert.deepEqual(a.map((e) => e.type + ' ' + e.title), ['flight BA11: London - Singapore']);
+  const b = parseBooking('Your itinerary\nFlight BA 11 London (LHR) to Singapore (SIN)\nWed 25 Nov 2026 21:25 - 18:20\nShuttle bus to the terminal is included', DEF).events;
+  assert.deepEqual(b.map((e) => e.type), ['flight']);
+});
+check('a train under its own heading stays a train after a flight', () => {
+  const { events } = parseBooking('Flight W6 3001 OTP - LTN 12 Dec 2026 06:10 07:40\nTrain to the city\n13 Dec 2026 08:00 London → Oxford', DEF);
+  assert.deepEqual(events.map((e) => e.type), ['flight', 'train']);
+  assert.equal(events[1].title, 'Train: London - Oxford');
+});
+
+// 28. Day ranges
+check('"10 - 12 Dec 2026" is a three-day all-day event', () => {
+  for (const text of ['Web Summit conference\n10 - 12 Dec 2026\nLisbon', 'Web Summit conference\n10–12 December 2026\nLisbon', 'Web Summit conference\n10 Dec 2026 - 12 Dec 2026\nLisbon']) {
+    const ev = parseBooking(text, DEF).events[0];
+    assert.equal(ev.start.date + ' ' + ev.end.date + ' ' + ev.allDay, '2026-12-10 2026-12-12 true', text);
+    assert.equal(ev.title, 'Web Summit conference');
+  }
+  assert.equal(parseBooking('Web Summit 10–12 December 2026, Lisbon', DEF).events[0].title, 'Web Summit, Lisbon');
+  const timed = parseBooking('Workshop 10 - 12 Dec 2026, 09:00 - 17:00, Berlin', DEF).events[0];
+  assert.equal(timed.start.date + ' ' + timed.start.time + ' ' + timed.end.date + ' ' + timed.end.time, '2026-12-10 09:00 2026-12-12 17:00');
+});
+check('a time or a flight number before a date is not a range', () => {
+  const doors = parseBooking('Concert\nDoors 19:10 - 12 Dec 2026', DEF).events[0];
+  assert.equal(doors.start.date + ' ' + doors.start.time, '2026-12-12 19:10');
+  const fl = parseBooking('Itinerary\nFlight BA 11 - 12 Dec 2026 21:25 LHR - SIN', DEF).events[0];
+  assert.equal(fl.type + ' ' + fl.start.date, 'flight 2026-12-12');
+});
+
+// 29. Dot times need a time word next to them
+check('dot times: "19.30 Uhr", "ore 20.30", "at 19.30"', () => {
+  const de = parseBooking('Abendessen im Restaurant Tim Raue\n4. Dezember 2026 um 19.30 Uhr', DEF).events[0];
+  assert.equal(de.start.time + ' ' + de.title, '19:30 Abendessen im Restaurant Tim Raue');
+  const it = parseBooking('Cena al ristorante Da Mario\n4 dicembre 2026 ore 20.30', DEF).events[0];
+  assert.equal(it.start.time + ' ' + it.title, '20:30 Cena al ristorante Da Mario');
+  assert.equal(parseBooking('Dinner 04.12.2026 at 19.30', DEF).events[0].start.time, '19:30');
+  assert.equal(parseBooking('Stadtführung Berlin\n4. Dezember 2026, 10:00 Uhr', DEF).events[0].title, 'Stadtführung Berlin');
+  assert.equal(parseBooking('Museum ticket 4 Dec 2026, total 19.30 EUR', DEF).events[0].flags.timeAssumed, true);
+});
+
 console.log(failures ? failures + ' failing' : 'all parser fixtures pass');
 process.exit(failures ? 1 : 0);

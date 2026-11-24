@@ -14,7 +14,11 @@ vanilla JS, no build step, no runtime dependencies.
   bookings with a line of `---`), PDFs (scanned ones fall back to OCR),
   screenshots and photos (vendored tesseract.js, loaded only when an image is
   added), `.eml` / `.html` / `.txt` emails (attachments included) and Apple
-  Wallet `.pkpass` files.
+  Wallet `.pkpass` files. A scanned PDF is read for its first 6 pages; the
+  result says so when the file has more.
+- **Works in Safari on iPhone and iPad** — tested in the iOS Simulator on
+  iOS 26.3 (iPhone 17, iPad Pro 11) and iOS 18.6 (iPhone 16): PDF, OCR and
+  pasted text all convert.
 - **One event per booking** — a document with two flights yields two events.
   The same trip seen in several documents (an e-ticket and its boarding pass)
   merges into one event that keeps the best of each: times from the boarding
@@ -34,8 +38,12 @@ vanilla JS, no build step, no runtime dependencies.
   Reads itinerary tables, boarding passes, train tickets, hotel vouchers and
   free text in the date formats real confirmations use (ISO, US, EU with
   dots, slashes or dashes, month names in several languages, `28JAN`, `15Nov2026`, weekday prefixes,
-  12h/24h/`18h05` times). Bookkeeping dates (booked on, issued, date of
+  12h/24h/`18h05` times, `19.30 Uhr`, day ranges such as `10–12 Dec 2026`).
+  Bookkeeping dates (booked on, issued, date of
   birth), policy text and office hours are ignored.
+- **Calendar targets** — Google, Apple (`.ics`), Outlook.com, Outlook 365
+  (work or school accounts), Yahoo and a plain `.ics` file. You select the
+  buttons in Settings.
 - **Editable results** — every event can be corrected before export; hotel
   stays are all-day banners by default (a timed block is one setting away).
   An estimated arrival moves with the departure time when you edit it.
@@ -124,6 +132,9 @@ node tests/extract.test.mjs    # PDF extraction + parse (generates its own PDF)
 node tests/debug-pdfs.mjs      # print what the parser makes of each PDF fixture
 ```
 
+GitHub Actions runs `npm test` on each push to `main` and on each pull
+request (`.github/workflows/test.yml`).
+
 Committed fixtures are anonymized. Put real documents in
 `tests/fixtures/private/`: git ignores that folder, and
 `node tests/debug-pdfs.mjs` reads the PDFs in it.
@@ -179,3 +190,15 @@ data, public domain, via the `airports-json` dev dependency).
 - **OCR** is English-trained and tuned for screenshots; photos of paper
   tickets are hit-and-miss. The engine is a ~7 MB download the first time an
   image is added.
+- **HEIC photos**: Safari opens them, Chrome does not. In Chrome the file
+  gets a message that asks for a JPEG or a screenshot. The iPhone photo
+  picker converts HEIC to JPEG by itself.
+- **Outlook 365 link**: Microsoft does not document this URL. The app uses
+  the form that the Microsoft community reports as working
+  (`outlook.office.com/calendar/action/compose`). Nobody tested it here with
+  a work account.
+- **Day ranges** without a clock time become one all-day event that covers
+  every day of the range.
+- **Colour contrast**: Lighthouse accessibility is 95. The two open items are
+  the brand accent `#6366f1`: white button text on it (4.46:1) and the "To"
+  of the wordmark (4.18:1). Both come from `websquadesign.md`.

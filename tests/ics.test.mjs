@@ -162,6 +162,13 @@ check('folded ICS lines stay within 75 bytes and never split a character', () =>
   assert.ok(unfolded.includes('SUMMARY:🎭 ' + 'Ünïcödé '.repeat(12) + '🎪🎪🎪'));
 });
 
+check('Outlook 365 link uses the work host and the same fields', () => {
+  const personal = outlookUrl(FLIGHT, SET), work = outlookUrl(FLIGHT, SET, true);
+  assert.ok(personal.startsWith('https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject='));
+  assert.ok(work.startsWith('https://outlook.office.com/calendar/action/compose?rru=addevent&subject='));
+  assert.equal(work.split('&subject=')[1], personal.split('&subject=')[1]);
+});
+
 check('UID is stable per booking and unique within a file', () => {
   const uids = (ics) => ics.split('\r\n').filter((l) => l.startsWith('UID:'));
   assert.deepEqual(uids(icsFor([FLIGHT], SET)), uids(icsFor([FLIGHT], SET)));

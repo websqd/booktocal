@@ -6,6 +6,25 @@
 var BTCExtract = (function () {
   'use strict';
 
+  // Safari has no async iteration of ReadableStream, and pdf.js reads page
+  // text with "for await (chunk of stream)".
+  (function () {
+    if (typeof ReadableStream === 'undefined' || typeof Symbol === 'undefined' || !Symbol.asyncIterator) return;
+    if (ReadableStream.prototype[Symbol.asyncIterator]) return;
+    ReadableStream.prototype[Symbol.asyncIterator] = function () {
+      var reader = this.getReader();
+      var it = {
+        next: function () { return reader.read(); },
+        return: function () {
+          var done = function () { reader.releaseLock(); return { done: true, value: undefined }; };
+          return reader.cancel().then(done, done);
+        },
+      };
+      it[Symbol.asyncIterator] = function () { return it; };
+      return it;
+    };
+  })();
+
   // Reconstruct reading-order lines from pdf.js text items. Items are grouped
   // into rows by baseline y (2pt tolerance) and ordered by x. A normal word gap
   // becomes a space; a gap wider than COLUMN_GAP_EM font sizes is a table
