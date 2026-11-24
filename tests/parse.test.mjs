@@ -268,5 +268,77 @@ check('--- separates bookings pasted together', () => {
   assert.deepEqual(events.map((e) => e.type), ['hotel', 'flight']);
 });
 
+// 22. "+1" next to an arrival whose printed date is already the next day
+check('"+1" does not shift an arrival date that is already later', () => {
+  const { events } = parseBooking('Flight BA11\nLondon (LHR) to Singapore (SIN)\nDeparture: 25 Nov 2026 21:25\nArrival: 26 Nov 2026 18:20 +1', DEF);
+  assert.equal(events[0].end.date, '2026-11-26');
+});
+check('"+1" still shifts an arrival printed without its own date', () => {
+  const { events } = parseBooking('Flight QR 836\nDoha (DOH) to Bangkok (BKK)\n25 Nov 2026\nDeparture: 20:05\nArrival: 06:40 +1', DEF);
+  assert.equal(events[0].end.date, '2026-11-26');
+});
+
+// 23. "Visa" the payment card, and travel advice, are not visa documents
+check('hotel paid with a Visa card stays a hotel', () => {
+  const { events } = parseBooking(
+    'Grand Hotel Plaza\nBooking confirmation number: 9876543210\nCheck-in: Fri, Dec 4, 2026 (from 15:00)\nCheck-out: Sun, Dec 6, 2026\n' +
+    'Payment method: Visa ending 4242\nThis rate is valid until 1 Dec 2026', DEF);
+  assert.deepEqual(events.map((e) => e.type), ['hotel']);
+});
+check('hotel that mentions visa support stays a hotel', () => {
+  const { events } = parseBooking(
+    'Hotel Europa Rome\nCheck-in: 4 Dec 2026\nCheck-out: 6 Dec 2026\nNeed a visa support letter? Ask the front desk.\nOffer valid until 1 Dec 2026', DEF);
+  assert.deepEqual(events.map((e) => e.type), ['hotel']);
+});
+check('travel-document expiry on a flight booking is not a visa deadline', () => {
+  const { events } = parseBooking(
+    'Wizz Air booking confirmation\nFlight W6 3001  Bucharest (OTP) to London (LTN)\nDeparture: 12 Dec 2026 06:10   Arrival: 12 Dec 2026 07:40\n' +
+    'Travel document\nExpiry date: 14 Mar 2031\nPlease check visa requirements for your destination.', DEF);
+  assert.deepEqual(events.map((e) => e.type), ['flight']);
+});
+check('a plain visa still yields its deadline', () => {
+  const { events } = parseBooking('VISA\nType of visa: Tourist\nValid until: 14 Mar 2027\nNumber of entries: 1', DEF);
+  assert.deepEqual(events.map((e) => e.type + ' ' + e.start.date), ['deadline 2027-03-14']);
+});
+
+// 24. Dashed numeric dates are day-first; a 2-digit year is not accepted
+check('dashed numeric date', () => {
+  const { events } = parseBooking('Concert ticket\nColdplay live\nDate: 25-12-2026 at 20:00\nVenue: Arena Nationala, Bucharest', DEF);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].start.date, '2026-12-25');
+  assert.equal(events[0].title, 'Coldplay live');
+  assert.equal(parseBooking('Dinner 05-12-2026 19:30', DEF).events[0].start.date, '2026-12-05');
+  assert.equal(parseBooking('Dinner 12-25-2026 19:30', DEF).events[0].start.date, '2026-12-25');
+  assert.equal(parseBooking('Locker 12-11-26 opens 19:30', DEF).events.length, 0);
+});
+
+// 25. Ambiguous slash dates follow the caller's region and are flagged
+check('ambiguous slash date: region hint and flag', () => {
+  const text = 'Dinner reservation 05/12/2026 19:30';
+  const us = parseBooking(text, DEF).events[0];
+  assert.equal(us.start.date, '2026-05-12');
+  assert.equal(us.flags.dateOrderAssumed, true);
+  const eu = parseBooking(text, { now: NOW, dayFirst: true }).events[0];
+  assert.equal(eu.start.date, '2026-12-05');
+  assert.equal(eu.flags.dateOrderAssumed, true);
+  assert.ok(eu.notes.some((n) => /day\/month/.test(n)), eu.notes.join('|'));
+  // The document itself settles it: no flag, hint ignored.
+  const settled = parseBooking('Booked 25/11/2026\nDinner reservation 05/12/2026 19:30', { now: NOW, dayFirst: false }).events[0];
+  assert.equal(settled.start.date, '2026-12-05');
+  assert.equal(settled.flags.dateOrderAssumed, undefined);
+  assert.equal(parseBooking('Dinner 13/12/2026 19:30', DEF).events[0].flags.dateOrderAssumed, undefined);
+});
+
+// 26. Titles do not keep label words or orphaned punctuation
+check('train route drops the words in front of the station', () => {
+  const a = parseBooking('Train ticket Bucuresti Nord → Brasov\nDate: 05.12.2026 Departure 08:00 Arrival 10:30', DEF).events[0];
+  assert.equal(a.title, 'Train: Bucuresti Nord - Brasov');
+  const b = parseBooking('Train IR 1765 Bucuresti Nord → Timisoara Nord\nDate 10 Dec 2026 Departs 21:45 Arrives 06:30', DEF).events[0];
+  assert.equal(b.title, 'IR 1765: Bucuresti Nord - Timisoara Nord');
+});
+check('generic title drops punctuation left by the date and time', () => {
+  assert.equal(parseBooking('Workshop: 10 Dec 2026, 2pm - 5pm, Berlin', DEF).events[0].title, 'Workshop: Berlin');
+});
+
 console.log(failures ? failures + ' failing' : 'all parser fixtures pass');
 process.exit(failures ? 1 : 0);

@@ -54,8 +54,9 @@ export default {
       return handleVerifyCode(request, env);
     }
 
-    // Any other path falls through to static assets (vendored pdf.js under
-    // /vendor/). Unknown paths still get the plain hardened 404.
+    // Existing files under public/ are served before this Worker runs (their
+    // headers come from public/_headers); this covers the remaining cases.
+    // Unknown paths still get the plain hardened 404.
     if (method === "GET" && pathname.startsWith("/vendor/")) {
       return env.ASSETS.fetch(request);
     }
@@ -114,8 +115,8 @@ function tooManyRequests() {
 
 // Two-layer telemetry: console.log feeds Workers Logs; the EVENTS Analytics
 // Engine dataset is the system of record. Best-effort — telemetry must never
-// break the request path. Only page loads and unlock attempts are logged;
-// booking content is never transmitted to this server at all.
+// break the request path. Only unlock attempts are logged; booking content is
+// never transmitted to this server at all.
 function logEvent(env, request, event, fields = {}) {
   const cf = (request && request.cf) || {};
   const entry = {

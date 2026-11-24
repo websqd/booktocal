@@ -14,6 +14,7 @@ export function appPage(nonce, payLink) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BookToCal — bookings to calendar events</title>
 <meta name="description" content="Drop flight, train, hotel or ticket confirmations — PDFs, screenshots, emails or pasted text — and get Google / Apple / Outlook calendar events with the right local times. Everything is read in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='3'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4'/%3E%3C/svg%3E">
 <style>${css()}</style>
 </head>
 <body>
@@ -132,7 +133,7 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
     <p class="overline">Calendar targets</p>
     <p class="hint">Which buttons appear on each event.</p>
     <label class="check-row"><input type="checkbox" data-target="google" checked> <span>Google Calendar <span class="tag">default</span></span></label>
-    <label class="check-row"><input type="checkbox" data-target="apple"> <span>Apple Calendar <span class="hint-inline">(.ics file)</span></span></label>
+    <label class="check-row"><input type="checkbox" data-target="apple" checked> <span>Apple Calendar <span class="hint-inline">(.ics file)</span></span></label>
     <label class="check-row"><input type="checkbox" data-target="outlook"> <span>Outlook</span></label>
     <label class="check-row"><input type="checkbox" data-target="yahoo"> <span>Yahoo</span></label>
     <label class="check-row"><input type="checkbox" data-target="ics" checked> <span>.ics file</span></label>
@@ -172,6 +173,7 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
       <button type="button" id="verify-code-btn" class="btn secondary">Activate</button>
       <p id="code-error" class="code-error" role="alert"></p>
     </div>
+    <p id="gate-back-row" class="gate-alt hidden"><button type="button" id="gate-back" class="link-btn">Back to your events</button></p>
   </div>
 </div>
 
@@ -192,6 +194,8 @@ var ACTIVATED_KEY = 'btcActivated';
 var SETTINGS_KEY = 'btcSettings';
 var THEME_KEY = 'btcTheme';
 var FREE_LIMIT = 3;
+// No way to pay yet means no gate: nobody may get stuck behind it.
+var GATE_ON = !!PAY_LINK;
 
 var SETTING_DEFAULTS = {
   targets: { google: true, apple: true, outlook: false, yahoo: false, ics: true },
@@ -372,8 +376,10 @@ function closeSettings(){
 }
 
 // --- counter & freemium gate ----------------------------------------------
+function atLimit(){ return GATE_ON && !activated && convertCount >= FREE_LIMIT; }
 function updateCounter(){
   var el = qs('#counter');
+  if (!GATE_ON){ el.className = 'counter hidden'; return; }
   if (activated){ el.className = 'counter unlimited'; el.textContent = '\\u221e'; return; }
   el.className = 'counter' + (convertCount >= FREE_LIMIT - 1 ? ' low' : '');
   el.textContent = convertCount + '/' + FREE_LIMIT + ' free';
@@ -384,14 +390,15 @@ function renderEntryView(){
   updateCounter();
   qs('#append-note').classList.toggle('hidden', !appendMode);
   if (appendMode) qs('#append-text').textContent = 'Adding to your ' + currentEvents.length + ' event' + (currentEvents.length === 1 ? '' : 's') + '.';
-  if (activated){
+  if (activated || !GATE_ON){
     gate.classList.add('hidden');
     banner.classList.add('hidden');
     compose.classList.remove('hidden');
-  } else if (convertCount >= FREE_LIMIT){
+  } else if (atLimit()){
     compose.classList.add('hidden');
     banner.classList.add('hidden');
     gate.classList.remove('hidden');
+    qs('#gate-back-row').classList.toggle('hidden', !currentEvents.length);
   } else {
     gate.classList.add('hidden');
     compose.classList.remove('hidden');
@@ -496,7 +503,7 @@ qs('#text-input').addEventListener('keydown', function(e){
 
 async function convertNow(){
   if (converting) return;
-  if (!activated && convertCount >= FREE_LIMIT){ renderEntryView(); return; }
+  if (atLimit()){ renderEntryView(); return; }
   var text = qs('#text-input').value;
   if (!text.trim() && !pendingFiles.length){ toast('Paste a booking or add a file first', 'warning'); return; }
 
@@ -534,7 +541,8 @@ async function convertNow(){
       defaultTime: settings.defaultTime,
       defaultDurationMin: settings.defaultDuration,
       noTimeAllDay: settings.noTimeAllDay,
-      hotelAllDay: settings.hotelAllDay
+      hotelAllDay: settings.hotelAllDay,
+      dayFirst: slashDayFirst()
     });
   } catch(e){
     setBusy(false);
@@ -583,6 +591,17 @@ async function convertNow(){
   toast(added + ' event' + (added === 1 ? '' : 's') + (wasAppend ? ' added' : ' found'), 'success');
 }
 
+// How to read 05/12/2026 when the document does not say. "en-US" is also the
+// default browser language outside the US, so the timezone must agree.
+function slashDayFirst(){
+  var lang = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+  var region = ((lang.match(/-([A-Za-z]{2})(?:-|$)/) || [])[1] || '').toUpperCase();
+  var zone = '';
+  try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e){}
+  var monthFirst = (region === 'US' && /^(?:America|Pacific)\\//.test(zone)) || (region === 'PH' && zone === 'Asia/Manila');
+  return !monthFirst;
+}
+
 function eventKey(ev){
   var m = ev.meta || {};
   return ev.type + '|' + String(m.number || ev.title).toLowerCase().replace(/\\s+/g, '') + '|' + ev.start.date;
@@ -602,13 +621,18 @@ qs('#add-more').addEventListener('click', function(){
   appendMode = true;
   qs('#results').classList.add('hidden');
   renderEntryView();
-  if (activated || convertCount < FREE_LIMIT) qs('#text-input').focus();
+  if (!atLimit()) qs('#text-input').focus();
 });
-qs('#append-cancel').addEventListener('click', function(){
+function backToEvents(){
   appendMode = false;
   qs('#compose').classList.add('hidden');
   qs('#gate').classList.add('hidden');
   qs('#results').classList.remove('hidden');
+}
+qs('#append-cancel').addEventListener('click', backToEvents);
+qs('#gate-back').addEventListener('click', backToEvents);
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && currentEvents.length && !qs('#gate').classList.contains('hidden')) backToEvents();
 });
 
 // --- results: rendering ------------------------------------------------------
@@ -711,6 +735,7 @@ function chipsFor(ev){
   if (f.endEstimated) warn('Arrival estimated', 'No arrival time in the document: estimated from the flight distance. Edit it if you know better.');
   if (f.startIsBoarding) warn('Starts at boarding time', 'The document has no departure time, only a boarding time.');
   if (f.yearAssumed) warn('Year assumed', 'The document has no year. Check the date.');
+  if (f.dateOrderAssumed) warn('Date order assumed', 'The date is written with slashes and can be read two ways. Check the day and the month.');
   if (f.timeAssumed && !ev.allDay) warn('Time assumed', 'No time in the document: your default start time is used.');
   if (ev.confidence === 'low' && !f.timeAssumed) warn('Check details', 'This one was hard to read. Check the details before adding it.');
   (ev.notes || []).forEach(function(n){ if (/Another source/.test(n)) warn('Sources disagree', n); });
@@ -844,10 +869,34 @@ qs('#event-list').addEventListener('change', function(e){
   var c = cardEvent(inp);
   if (!c || !c.ev) return;
   var field = inp.getAttribute('data-field');
-  if (field === 'title' || field === 'location') return; // handled on input
+  if (field === 'title' || field === 'location'){ refreshCard(c.card, c.ev); return; } // value set on input
   applyField(c.ev, field, inp);
-  renderEvents();
+  // The all-day switch changes which fields the form has. Everything else
+  // updates in place, so the input being typed in keeps the focus.
+  if (field === 'allDay'){
+    renderEvents();
+    var box = qs('.event-card[data-idx="' + c.idx + '"] [data-field="allDay"]');
+    if (box) box.focus();
+  } else {
+    refreshCard(c.card, c.ev);
+  }
 });
+
+function refreshCard(card, ev){
+  var when = card.querySelector('.ev-when');
+  when.innerHTML = whenBlock(ev);
+  var chips = card.querySelector('.chips');
+  if (chips) chips.remove();
+  when.insertAdjacentHTML('afterend', chipsFor(ev));
+  Array.prototype.forEach.call(card.querySelectorAll('[data-field]'), function(inp){
+    var parts = inp.getAttribute('data-field').split('.');
+    if (parts.length !== 2) return;
+    if (inp === document.activeElement && inp.value) return;
+    var value = (ev[parts[0]] && ev[parts[0]][parts[1]]) || '';
+    if (inp.value !== value) inp.value = value;
+  });
+  qs('#results-meta').textContent = metaLine();
+}
 
 function dropNote(ev, re){
   ev.notes = (ev.notes || []).filter(function(n){ return !re.test(n); });
@@ -878,10 +927,35 @@ function applyField(ev, field, inp){
     if (!inp.value){ ev.start.date = todayIso(); }
     if (ev.end && (!ev.end.date || ev.end.date < ev.start.date)) ev.end.date = ev.start.date;
     delete f.yearAssumed; dropNote(ev, /no year/);
+    delete f.dateOrderAssumed; dropNote(ev, /read two ways/);
   }
   if (field === 'start.time'){ delete f.timeAssumed; delete f.startIsBoarding; dropNote(ev, /boarding time/); }
   if (field === 'end.time' || field === 'end.date'){ delete f.endEstimated; delete f.endAssumed; dropNote(ev, /estimated/); }
   if (field === 'end.date' && !inp.value) ev.end.date = ev.start.date;
+  if (field === 'start.date' || field === 'start.time') followStart(ev);
+}
+
+// An estimated or assumed end was derived from the start, so it moves with it.
+function followStart(ev){
+  var f = ev.flags || {}, m = ev.meta || {};
+  if (ev.allDay || !ev.start.time) return;
+  var mins = 0;
+  if (f.endEstimated && ev.type === 'flight'){
+    var a = m.from && BTCGeo.airport(m.from.code), b = m.to && BTCGeo.airport(m.to.code);
+    mins = (m.durationMin || BTCGeo.flightMinutes(a, b) || 0) + (f.startIsBoarding ? 35 : 0);
+  } else if (f.endAssumed){
+    mins = settings.defaultDuration;
+  }
+  if (!mins) return;
+  var utc = ev.tz ? BTCTz.wallToUtc(ev.start.date, ev.start.time, ev.tz) : null;
+  var wall = utc ? BTCTz.utcToWall(new Date(utc.getTime() + mins * 60000), ev.tzEnd || ev.tz) : null;
+  if (!wall){
+    var p = ev.start.time.split(':').map(Number);
+    var day = new Date(ev.start.date + 'T00:00:00Z');
+    day.setUTCDate(day.getUTCDate() + Math.floor((p[0] * 60 + p[1] + mins) / 1440));
+    wall = { date: day.toISOString().slice(0, 10), time: plusMinutes(ev.start.time, mins) };
+  }
+  ev.end = { date: wall.date, time: wall.time };
 }
 
 function todayIso(){

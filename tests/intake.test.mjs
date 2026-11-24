@@ -28,13 +28,14 @@ function zip(entries) {
   let offset = 0;
   const u16 = (n) => [n & 255, (n >> 8) & 255];
   const u32 = (n) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
-  for (const [name, data, deflate] of entries) {
+  for (const [name, data, deflate, claimed] of entries) {
+    const full = claimed == null ? data.length : claimed; // a header can lie about the inflated size
     const nameBytes = enc(name);
     const body = deflate ? new Uint8Array(deflateRawSync(data)) : data;
     const head = [...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(deflate ? 8 : 0), ...u16(0), ...u16(0), ...u32(0),
-      ...u32(body.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0)];
+      ...u32(body.length), ...u32(full), ...u16(nameBytes.length), ...u16(0)];
     central.push([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(deflate ? 8 : 0), ...u16(0), ...u16(0), ...u32(0),
-      ...u32(body.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0),
+      ...u32(body.length), ...u32(full), ...u16(nameBytes.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0),
       ...u32(offset), ...nameBytes]);
     chunks.push(Uint8Array.from(head), nameBytes, body);
     offset += head.length + nameBytes.length + body.length;
@@ -129,6 +130,23 @@ await check('unzip reads stored and deflated entries', async () => {
   assert.equal(new TextDecoder().decode(files['a.txt']), 'stored');
   assert.equal(JSON.parse(new TextDecoder().decode(files['dir/b.json'])).x, Number('1'.repeat(500)));
   await assert.rejects(() => unzip(enc('not a zip, definitely not one')));
+});
+
+await check('unzip refuses entries that inflate past the cap', async () => {
+  const big = new Uint8Array(6 * 1024 * 1024); // deflates to a few KB
+  const honest = await unzip(new Uint8Array(zip([['big.json', big, true], ['a.txt', enc('ok'), false]])));
+  assert.deepEqual(Object.keys(honest), ['a.txt']);
+  await assert.rejects(() => unzip(new Uint8Array(zip([['big.json', big, true, 10]]))), /too large/);
+});
+
+await check('OCR canvas stays inside the iOS pixel limit', () => {
+  const f = V.BTCIntake.upscaleFactor;
+  assert.ok(Math.abs(f(1179, 2556) - 2400 / 1179) < 1e-9, 'a phone screenshot is still doubled');
+  for (const [w, h] of [[1170, 12000], [6000, 4000], [400, 30000], [9000, 9000]]) {
+    const k = f(w, h);
+    assert.ok(w * k * h * k <= 16000000 + 1, w + 'x' + h + ' -> ' + Math.round(w * k * h * k));
+    assert.ok(w * k <= 4096 + 1e-6);
+  }
 });
 
 const PASS = {

@@ -167,9 +167,25 @@ var BTCIntake = (function () {
 
   // --- zip (.pkpass) ----------------------------------------------------------------------
 
-  async function inflateRaw(bytes) {
-    var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
+  var MAX_ENTRY = 5 * 1024 * 1024; // a pass.json is a few KB
+
+  // Stops at `limit` bytes of output: the sizes in a zip header can lie.
+  async function inflateRaw(bytes, limit) {
+    var reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+    var chunks = [], total = 0;
+    for (;;) {
+      var step = await reader.read();
+      if (step.done) break;
+      total += step.value.length;
+      if (total > limit) {
+        try { await reader.cancel(); } catch (e) {}
+        throw new Error('Zip entry is too large');
+      }
+      chunks.push(step.value);
+    }
+    var out = new Uint8Array(total), at = 0;
+    for (var i = 0; i < chunks.length; i++) { out.set(chunks[i], at); at += chunks[i].length; }
+    return out;
   }
 
   // unzip(bytes, wanted) -> { name: Uint8Array } for entries whose name passes
@@ -188,6 +204,7 @@ var BTCIntake = (function () {
       if (view.getUint32(at, true) !== 0x02014b50) break;
       var method = view.getUint16(at + 10, true);
       var size = view.getUint32(at + 20, true);
+      var fullSize = view.getUint32(at + 24, true);
       var nameLen = view.getUint16(at + 28, true);
       var extraLen = view.getUint16(at + 30, true);
       var commentLen = view.getUint16(at + 32, true);
@@ -195,10 +212,10 @@ var BTCIntake = (function () {
       var name = decodeText(bytes.subarray(at + 46, at + 46 + nameLen), 'utf-8');
       at += 46 + nameLen + extraLen + commentLen;
       if (wanted && !wanted(name)) continue;
-      if (size > 5 * 1024 * 1024) continue; // a pass.json is a few KB
+      if (size > MAX_ENTRY || fullSize > MAX_ENTRY) continue;
       var dataAt = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
       var data = bytes.subarray(dataAt, dataAt + size);
-      files[name] = method === 0 ? data : method === 8 ? await inflateRaw(data) : new Uint8Array(0);
+      files[name] = method === 0 ? data : method === 8 ? await inflateRaw(data, MAX_ENTRY) : new Uint8Array(0);
     }
     return files;
   }
@@ -276,14 +293,24 @@ var BTCIntake = (function () {
     return ocrWorker;
   }
 
+  var MAX_CANVAS_AREA = 16000000;
+
   // Screenshots carry small type; doubling the pixels (on white, so transparent
   // PNGs do not turn black) is what makes Tesseract read "VJ953" not "VI953".
-  function upscale(source, width, height) {
+  function upscaleFactor(width, height) {
     var scale = Math.max(1, Math.min(3, 2400 / Math.max(width, 1)));
     if (width * scale > 4096) scale = 4096 / width;
+    // iOS Safari returns a blank canvas above ~16.7 million pixels.
+    var area = width * scale * height * scale;
+    if (area > MAX_CANVAS_AREA) scale *= Math.sqrt(MAX_CANVAS_AREA / area);
+    return scale;
+  }
+
+  function upscale(source, width, height) {
+    var scale = upscaleFactor(width, height);
     var canvas = document.createElement('canvas');
-    canvas.width = Math.round(width * scale);
-    canvas.height = Math.round(height * scale);
+    canvas.width = Math.max(1, Math.floor(width * scale));
+    canvas.height = Math.max(1, Math.floor(height * scale));
     var ctx = canvas.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -397,6 +424,7 @@ var BTCIntake = (function () {
     htmlToText: htmlToText,
     parseEml: parseEml,
     unzip: unzip,
+    upscaleFactor: upscaleFactor,
     passToText: passToText,
   };
 })();

@@ -24,7 +24,8 @@ var BTCParser = (function () {
   // --- public API ---------------------------------------------------------------
 
   // parseBooking(text, opts) -> { events }
-  // opts: { defaultTime 'HH:MM', defaultDurationMin, noTimeAllDay, hotelAllDay, now: Date }
+  // opts: { defaultTime 'HH:MM', defaultDurationMin, noTimeAllDay, hotelAllDay, now: Date,
+  //         dayFirst: boolean — how to read 05/12/2026 when the document does not say }
   function parseBooking(text, opts) {
     return parseDocuments([{ name: '', text: text }], opts);
   }
@@ -62,6 +63,7 @@ var BTCParser = (function () {
       defaultDurationMin: clampInt(opts.defaultDurationMin, 5, 720, 30),
       noTimeAllDay: !!opts.noTimeAllDay,
       hotelAllDay: opts.hotelAllDay !== false,
+      dayFirst: typeof opts.dayFirst === 'boolean' ? opts.dayFirst : null,
       now: opts.now instanceof Date ? opts.now : new Date(),
     };
   }
@@ -136,8 +138,8 @@ var BTCParser = (function () {
   const YEAR = '((?:19|20)\\d{2}|\\d{2}(?![\\d:]))';
   const DAY = '(0?[1-9]|[12]\\d|3[01])';
   const RE_ISO = new RegExp('\\b((?:19|20)\\d{2})-(0?[1-9]|1[0-2])-' + DAY + '(?!\\d)', 'g');
-  // 04.09.2026 / 4/9/26 — which side is the day is decided per document.
-  const RE_NUMERIC = new RegExp('\\b' + DAY + '([./])' + DAY + '\\2' + YEAR + '(?!\\d)', 'g');
+  // 04.09.2026 / 4/9/26 / 04-09-2026 — which side is the day is decided per document.
+  const RE_NUMERIC = new RegExp('\\b' + DAY + '([./-])' + DAY + '\\2' + YEAR + '(?!\\d)', 'g');
   // "Sep 4, 2026" / "September 4" / "Nov11"
   const RE_MONTH_FIRST = new RegExp(
     '\\b(' + MONTH_SRC + ')(?![a-z])\\.?\\s{0,2}' + DAY + '(?:st|nd|rd|th)?(?![\\d:])(?:,)?\\s*' + YEAR + '?', 'gi');
@@ -146,7 +148,7 @@ var BTCParser = (function () {
     '(?<![\\d:.])' + DAY + '(?:st|nd|rd|th)?\\.?(?:\\s+(?:of|de)\\s+|\\s{0,2}[/\\-.]?\\s{0,2})(' + MONTH_SRC + ')(?![a-z])\\.?,?' +
     '(?:\\s{0,2}[/\\-.]?\\s{0,2}' + YEAR + ')?', 'gi');
 
-  // Every date in a line, with positions. ctx: { now, dayFirst }.
+  // Every date in a line, with positions. ctx: { now, dayFirst, dayFirstDefault }.
   function findDates(line, ctx) {
     const found = [];
     const add = (m, y, mo, d) => found.push({ index: m.index, end: m.index + m[0].length, y: y == null ? null : Number(y), m: Number(mo), d: Number(d) });
@@ -156,10 +158,16 @@ var BTCParser = (function () {
     const num = new RegExp(RE_NUMERIC.source, 'g');
     while ((m = num.exec(line))) {
       const a = Number(m[1]), b = Number(m[3]);
-      // Dots are day-first (EU). Slashes: a value above 12 settles it; otherwise
-      // the document-wide hint, then US month-first.
-      const dayFirst = m[2] === '.' || a > 12 || (b <= 12 && ctx.dayFirst === true);
+      // Dashes need a 4-digit year: "12-11-26" is as often a code as a date.
+      if (m[2] === '-' && m[4].length !== 4) continue;
+      // Dots and dashes are day-first (EU). Slashes: a value above 12 settles
+      // it; otherwise the document-wide hint, then the caller's region, then
+      // US month-first.
+      const open = m[2] === '/' && a <= 12 && b <= 12 && ctx.dayFirst == null;
+      const dayFirst = m[2] === '.' || a > 12 || (b <= 12 && (m[2] === '-' || (open ? ctx.dayFirstDefault === true : ctx.dayFirst === true)));
       add(m, m[4], dayFirst ? b : a, dayFirst ? a : b);
+      // Either reading is a real date: remember which one was picked.
+      if (open && a !== b) found[found.length - 1].orderAssumed = dayFirst ? 'day/month' : 'month/day';
     }
     const mf = new RegExp(RE_MONTH_FIRST.source, 'gi');
     while ((m = mf.exec(line))) add(m, m[3], monthFromName(m[1]), m[2]);
@@ -314,7 +322,7 @@ var BTCParser = (function () {
 
   function prepare(text, defaults) {
     const raw = String(text || '').replace(/\r/g, '').split('\n').map((l) => repairOcr(l.replace(/\s+$/, ''))).filter((l) => l.trim());
-    const ctx = { now: defaults.now, dayFirst: dayFirstHint(raw) };
+    const ctx = { now: defaults.now, dayFirst: dayFirstHint(raw), dayFirstDefault: defaults.dayFirst };
     const lines = raw.map((t) => ({
       text: t,
       cells: t.split('\t').map((c) => c.trim()).filter(Boolean),
@@ -478,7 +486,7 @@ var BTCParser = (function () {
     };
   }
 
-  const startOf = (date, time) => ({ date: dateKey(date), time: time ? time.key : null, inferred: date.yearInferred || false });
+  const startOf = (date, time) => ({ date: dateKey(date), time: time ? time.key : null, inferred: date.yearInferred || false, order: date.orderAssumed || null });
 
   // --- booking references, seats ---------------------------------------------------------
 
@@ -621,6 +629,10 @@ var BTCParser = (function () {
   function groundStations(doc, i, dep, arr) {
     const L = doc.lines;
     const clean = (s) => String(s || '').replace(/^[\s|:,\-]+|[\s|:,\-]+$/g, '').trim();
+    // "Train ticket București Nord" / "Train IR 1765 București Nord" -> the station.
+    const station = (s) => clean(clean(s.replace(/^.*\bfrom\b/i, ''))
+      .replace(/^(?:your\s+)?(?:e-?ticket|train|rail|bus|coach|ferry|tren|zug|treno|autobus)\b(?:\s+(?:ticket|booking|reservation|journey|trip))?\s*[:\-–]?\s*/i, '')
+      .replace(/^[A-Z]{1,3}\s?\d{1,5}\b\s*[:\-–]?\s*(?=\S)/, ''));
     // "A → B" on the line or just around it.
     for (const j of [i, i - 1, i + 1, i - 2]) {
       if (j < 0 || j >= L.length) continue;
@@ -628,7 +640,7 @@ var BTCParser = (function () {
       for (const part of parts) {
         const m = part.split(ARROW);
         if (m.length === 2 && m[0] && m[1]) {
-          return { from: clean(m[0].replace(/^.*\bfrom\b/i, '')), to: clean(m[1]), firstLine: Math.min(i, j) };
+          return { from: station(m[0]), to: clean(m[1]), firstLine: Math.min(i, j) };
         }
         const ft = part.match(/\bfrom\s+(.{2,40}?)\s+to\s+(.{2,40}?)(?:\s+on\b|\s+at\b|[,.;]|$)/i);
         if (ft) return { from: clean(ft[1]), to: clean(ft[2]), firstLine: Math.min(i, j) };
@@ -1110,7 +1122,7 @@ var BTCParser = (function () {
     const ev = mkEvent({
       type: 'flight',
       icon: '✈️',
-      start: depDate ? { date: dateKey(depDate), time: dep ? dep.t.key : null, inferred: depDate.yearInferred || false } : null,
+      start: depDate ? startOf(depDate, dep && dep.t) : null,
       end: depDate && arr ? { date: dateKey(arrDate || depDate), time: arr.t.key, dateExplicit: !!arrDate, nextDay: nextDay } : null,
       meta: meta,
     });
@@ -1121,14 +1133,28 @@ var BTCParser = (function () {
 
   const RE_VISA_DOC = /\b(?:e-?visa|visa|e-?voa|voa|esta|travel authori[sz]ation|residence permit)\b/i;
   const RE_DEADLINE = /must be used before|must be used by|valid until|valid to|valid through|valid thru|use by|enter before|enter by|last day to enter|expir(?:es|y|ation)(?: date| on)?/i;
+  // "Visa" the payment card: "Paid with Visa", "Visa ending 4242", "Visa / Mastercard".
+  const RE_CARD_VISA = new RegExp(
+    '\\b(?:paid (?:with|by|via)|payment(?: method| type)?|card(?: type)?|credit card|debit card)\\s*:?\\s*visa\\b' +
+    '|\\bvisa\\s*(?:card|debit|credit|electron|ending|\\*+|x{2,}|•+|[-–]?\\s*\\d{4}\\b)' +
+    '|\\b(?:mastercard|amex|american express|maestro)\\b[\\s,/|&]*(?:or\\s+)?visa\\b' +
+    '|\\bvisa\\b[\\s,/|&]*(?:or\\s+)?(?:mastercard|amex|american express|maestro)\\b', 'gi');
+  // Wording only a visa document uses; a bare "visa" is also travel advice.
+  const RE_VISA_STRONG = /\b(?:e-?visa|e-?voa|voa|esta|travel authori[sz]ation|residence permit|visa\s*(?:no|number|nr|type|validity)\b|type of visa)/i;
+  const RE_OTHER_PAPER = /passport|travel document|identity card|\bid card\b|driving licen[cs]e|card number/i;
 
   function collectDeadlines(doc, events) {
-    if (!RE_VISA_DOC.test(doc.text)) return 0;
+    const text = doc.text.replace(RE_CARD_VISA, ' ');
+    if (!RE_VISA_DOC.test(text)) return 0;
+    // A booking that merely mentions visas ("check visa requirements") is not one.
+    if (!RE_VISA_STRONG.test(text) && (doc.typed || /\bcheck[\s-]?out\b/i.test(text))) return 0;
     const L = doc.lines;
     let made = 0;
     for (let i = 0; i < L.length; i++) {
       const m = L[i].text.match(RE_DEADLINE);
-      if (!m || /passport/i.test(L[i].text)) continue;
+      if (!m || RE_OTHER_PAPER.test(L[i].text)) continue;
+      // "Travel document" / "Expiry date: ..." — the label above names another paper.
+      if (i > 0 && !L[i - 1].allDates.length && RE_OTHER_PAPER.test(L[i - 1].text) && L[i - 1].text.length <= 40) continue;
       // The date after the label, else alone on one of the next two lines.
       let date = L[i].allDates.find((d) => d.index >= m.index && !d.stale) || null;
       for (let j = i + 1; !date && j <= Math.min(i + 2, L.length - 1); j++) {
@@ -1256,7 +1282,7 @@ var BTCParser = (function () {
         icon: '🏨',
         location: address || '',
         tz: G.tzFromText(address) || G.tzFromText(name) || hotelZone(doc, found.line, lastLine),
-        start: { date: inKey, time: null, inferred: found.date.yearInferred || false },
+        start: { date: inKey, time: null, inferred: found.date.yearInferred || false, order: found.date.orderAssumed || null },
         end: { date: outKey, time: null },
         confidence: name ? 'high' : 'medium',
         meta: {
@@ -1443,12 +1469,17 @@ var BTCParser = (function () {
       .replace(/\b(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*\b[,.]?/gi, ' ')
       .replace(/\b(?:departs?|arrives?|departure|arrival|from|until)\b\s*:?\s*$/i, ' ')
       .replace(/\s+/g, ' ')
+      // Cutting "10 Dec 2026, 2pm - 5pm" out of a line leaves its punctuation behind.
+      .replace(/\s*(?:[,;|·•\-–—]\s*){2,}/g, ', ')
+      .replace(/([:(])\s*,\s*/g, '$1 ')
       .replace(/(?:^|\s)(?:at|on|um|am|the)\s*$/i, '')
       .replace(/^[\s,:;|·•()\-–—]+|[\s,:;|·•()\-–—]+$/g, '')
       .replace(/\s+(?:at|on|departs?|arrives?)$/i, '')
       .replace(/\s+(?:at|on)$/i, '')
       .trim();
-    if (text.length >= 3 && /[a-z]{3}/i.test(text)) return text.slice(0, 80);
+    // A bare field label ("Date: 25-12-2026 at 20:00") is not a title.
+    const labelOnly = /^(?:date|when|time|day|date (?:and|&) time|data|datum|fecha)$/i.test(text);
+    if (!labelOnly && text.length >= 3 && /[a-z]{3}/i.test(text)) return text.slice(0, 80);
     for (const j of [at - 1, at - 2, at - 3, at + 1, at + 2]) {
       if (j < 0 || j >= L.length || L[j].dates.length) continue;
       const t = L[j].text.trim();
@@ -1556,8 +1587,13 @@ var BTCParser = (function () {
     } else if (ev.start.inferred) {
       ev.notes.push('The document has no year; ' + ev.start.date.slice(0, 4) + ' matches its weekday.');
     }
+    if (ev.start.order) {
+      ev.flags.dateOrderAssumed = true;
+      ev.notes.push('The date is written with slashes and can be read two ways; it is read as ' + ev.start.order + '.');
+    }
     if (!ev.allDay) applyDefaults(ev, defaults);
     delete ev.start.inferred;
+    delete ev.start.order;
     if (ev.end) { delete ev.end.dateExplicit; delete ev.end.nextDay; }
     for (const k of ['fallbackTitle', 'unsplit', 'word']) delete ev.meta[k];
     delete ev.rank;
@@ -1597,7 +1633,8 @@ var BTCParser = (function () {
         }
       }
     } else if (ev.end && ev.end.time) {
-      if (ev.end.nextDay) ev.end.date = shiftDate(ev.end.date, 1);
+      // A printed arrival date already later than the departure includes the "+1".
+      if (ev.end.nextDay && !(ev.end.dateExplicit && ev.end.date > ev.start.date)) ev.end.date = shiftDate(ev.end.date, 1);
       else if (!ev.end.dateExplicit && elapsedMinutes(ev.start.date, ev.start.time, ev.tz, ev.end.date, ev.end.time, ev.tzEnd) <= 0) {
         ev.end.date = shiftDate(ev.end.date, 1); // lands after midnight
       }

@@ -215,23 +215,36 @@ var BTCCal = (function () {
     return out.join(CRLF);
   }
 
-  var uidCounter = 0;
-  function uid() {
-    var bytes = new Uint8Array(8);
-    crypto.getRandomValues(bytes);
-    var hex = '';
-    for (var i = 0; i < bytes.length; i++) hex += pad2(bytes[i].toString(16));
-    return Date.now().toString(36) + '-' + (uidCounter++) + '-' + hex;
+  // FNV-1a, 32 bits, as 8 hex digits.
+  function hash(text, seed) {
+    var h = seed >>> 0;
+    for (var i = 0; i < text.length; i++) {
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    return ('0000000' + h.toString(16)).slice(-8);
+  }
+
+  // The same booking exported twice keeps its UID, so a calendar updates the
+  // event instead of adding a copy.
+  function uidOf(ev) {
+    var m = ev.meta || {};
+    var key = [ev.type || 'event', String(m.number || ev.title || '').toLowerCase().replace(/\s+/g, ''), ev.start.date].join('|');
+    return hash(key, 2166136261) + hash(key, 3339675911);
   }
 
   function icsFor(events, settings) {
     var lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//BookToCal//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
     var now = stamp(new Date(), '');
+    var seen = {};
     for (var i = 0; i < events.length; i++) {
       var ev = events[i];
       var r = resolve(ev, settings);
+      var id = uidOf(ev);
+      seen[id] = (seen[id] || 0) + 1;
       lines.push('BEGIN:VEVENT');
-      lines.push('UID:' + uid() + '@booktocal.com');
+      // Two events with one key in the same file must still differ.
+      lines.push('UID:' + id + (seen[id] > 1 ? '-' + seen[id] : '') + '@booktocal.com');
       lines.push('DTSTAMP:' + now);
       if (r.allDay) {
         lines.push('DTSTART;VALUE=DATE:' + compact(r.start.date));

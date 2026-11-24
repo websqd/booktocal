@@ -32,18 +32,22 @@ vanilla JS, no build step, no runtime dependencies.
   stay floating.
 - **Deterministic parser** (`public/vendor/parser.js`) — no AI, no network.
   Reads itinerary tables, boarding passes, train tickets, hotel vouchers and
-  free text in the date formats real confirmations use (ISO, US, EU, month
-  names in several languages, `28JAN`, `15Nov2026`, weekday prefixes,
+  free text in the date formats real confirmations use (ISO, US, EU with
+  dots, slashes or dashes, month names in several languages, `28JAN`, `15Nov2026`, weekday prefixes,
   12h/24h/`18h05` times). Bookkeeping dates (booked on, issued, date of
   birth), policy text and office hours are ignored.
 - **Editable results** — every event can be corrected before export; hotel
   stays are all-day banners by default (a timed block is one setting away).
+  An estimated arrival moves with the departure time when you edit it.
+- **No duplicates on re-import** — a booking keeps the same calendar UID each
+  time you export it, so a calendar updates the event and does not add a copy.
 - **Freemium** — 3 free conversions (a conversion is one click, however many
   files), then a paywall ("$5 or more", `PAYMENT_LINK` var). A shared
   `UNLOCK_CODE` (verified server-side in constant time) or the Konami easter
   egg (click the logo, then `↑ ↑ ↓ ↓ ← → ← → B A`) unlocks unlimited
   conversions. The counter is honest-user friction (localStorage), not access
-  control.
+  control. While `PAYMENT_LINK` is empty there is no gate, no counter and no
+  banner: nobody can pay, so nobody is stopped.
 - **UI** — follows the design tokens in `websquadesign.md` (dark default +
   light theme, CSS variables only).
 - The canonical production origin is **booktocal.com**; every other host
@@ -99,6 +103,9 @@ UNLOCK_CODE=dev-code
 PAYMENT_LINK=
 EOF
 npx wrangler dev
+
+# The gate only exists when a payment link is set. To see it locally:
+npx wrangler dev --var PAYMENT_LINK:https://example.com/pay
 ```
 
 `UNLOCK_CODE` unset in production makes `/api/verify-code` fail closed (500 →
@@ -117,6 +124,10 @@ node tests/extract.test.mjs    # PDF extraction + parse (generates its own PDF)
 node tests/debug-pdfs.mjs      # print what the parser makes of each PDF fixture
 ```
 
+Committed fixtures are anonymized. Put real documents in
+`tests/fixtures/private/`: git ignores that folder, and
+`node tests/debug-pdfs.mjs` reads the PDFs in it.
+
 `public/vendor/airports.js` is generated: `npm run build:airports` (OurAirports
 data, public domain, via the `airports-json` dev dependency).
 
@@ -131,6 +142,8 @@ data, public domain, via the `airports-json` dev dependency).
   `base-uri 'none'; form-action 'none'; frame-ancestors 'none'`.
 - **Security headers** on every response: `nosniff`, `DENY` framing,
   `no-referrer`, HSTS (2y, includeSubDomains), restrictive `Permissions-Policy`.
+  Cloudflare serves the files under `public/` without running the Worker, so
+  those responses get the same headers from `public/_headers`.
 - **Unlock endpoint**: constant-time compare (SHA-256 + `timingSafeEqual`),
   fails closed when `UNLOCK_CODE` is unset, rate-limited 10/min/IP, input
   normalized (case/whitespace-insensitive) and length-capped.
@@ -138,7 +151,8 @@ data, public domain, via the `airports-json` dev dependency).
   are HTML-escaped before insertion; ICS text is RFC 5545–escaped and lines
   are folded at 75 octets.
 - **Untrusted files**: HTML and email bodies are reduced to text with string
-  replacement, never inserted into the DOM; zip entries are size-capped.
+  replacement, never inserted into the DOM; a zip entry larger than 5 MB,
+  compressed or inflated, is refused.
 - **Freemium is friction, not enforcement** — the counter is client-side; a
   determined user can clear it. The unlock code is the only server-checked
   credential.
@@ -157,8 +171,11 @@ data, public domain, via the `airports-json` dev dependency).
   date without a year is the next occurrence — unless it passed within the
   last 45 days, in which case it stays in the current year.
 - **Slash dates**: one unambiguous date (`25/11/2026`) decides the whole
-  document; otherwise they default to US (07/04 = July 4). Dotted dates are
-  EU (04.07 = July 4).
+  document. Otherwise the browser decides: month first (07/04 = July 4) only
+  for a US or Philippine browser language in an American or Philippine
+  timezone, day first everywhere else. The card then shows a "Date order
+  assumed" chip. Dotted and dashed dates are EU (04.07 = July 4); a dashed
+  date needs a 4-digit year.
 - **OCR** is English-trained and tuned for screenshots; photos of paper
   tickets are hit-and-miss. The engine is a ~7 MB download the first time an
   image is added.

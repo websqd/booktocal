@@ -162,5 +162,19 @@ check('folded ICS lines stay within 75 bytes and never split a character', () =>
   assert.ok(unfolded.includes('SUMMARY:🎭 ' + 'Ünïcödé '.repeat(12) + '🎪🎪🎪'));
 });
 
+check('UID is stable per booking and unique within a file', () => {
+  const uids = (ics) => ics.split('\r\n').filter((l) => l.startsWith('UID:'));
+  assert.deepEqual(uids(icsFor([FLIGHT], SET)), uids(icsFor([FLIGHT], SET)));
+  const later = JSON.parse(JSON.stringify(FLIGHT));
+  later.start.time = '21:00';
+  assert.deepEqual(uids(icsFor([later], SET)), uids(icsFor([FLIGHT], SET)), 'a time edit keeps the UID');
+  const nextDay = JSON.parse(JSON.stringify(FLIGHT));
+  nextDay.start.date = '2026-11-26';
+  assert.notDeepEqual(uids(icsFor([nextDay], SET)), uids(icsFor([FLIGHT], SET)));
+  const twice = uids(icsFor([FLIGHT, FLIGHT], SET));
+  assert.equal(new Set(twice).size, 2);
+  for (const u of twice) assert.match(u, /^UID:[0-9a-f]{16}(?:-\d+)?@booktocal\.com$/);
+});
+
 console.log(failures ? failures + ' failing' : 'all ics tests pass');
 process.exit(failures ? 1 : 0);
