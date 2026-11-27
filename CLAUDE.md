@@ -94,6 +94,14 @@ npm run build:airports         # regenerate public/vendor/airports.js
   and needs `RE_VISA_STRONG` wording when the document is a booking.
 - Dates preceded by a bookkeeping label (`META_SRC`: booked on, issued, born…)
   never anchor an event. Add labels there, not special cases in collectors.
+- Generic event icons (`categoryIcon` in parser.js): `CATEGORIES` matches the
+  title, the location and the lines around it. `TITLE_CATEGORIES` (call 📞,
+  contact 📧) matches the title only and wins, because "Call us" and
+  "Contact us" are in most email footers.
+- A Blank event (`ev.blank`, set by ui.js like `ev.uid`) has no source text:
+  each title or location keystroke sets its icon again with
+  `BTCParser.categoryIcon(title, location)`. A parsed event keeps the icon
+  from parsing, because that icon can come from the lines around the title.
 - Titles and descriptions are computed, not stored: change `finalize*` in
   parser.js for titles, `detailLines` in ics.js for descriptions.
 - Timezones: extend the tables in geo.js (or regenerate airports.js), never
@@ -118,8 +126,24 @@ npm run build:airports         # regenerate public/vendor/airports.js
   for a half-typed segment. The handler ignores empty values; `focusout`
   restores a date and removes a time.
 - Colours: readable text uses `--text-secondary`; `--text-muted` is only for
-  placeholders and disabled buttons. Coloured text on its own tint mixes the
-  colour with `--text-primary` (badges, warn chips).
+  placeholders and disabled buttons. Coloured text mixes the colour with
+  `--text-primary` so it stays readable in both themes: use `--link` and
+  `--warn-text`, never the raw accent or semantic colour as text.
+- Look: flat and typographic. The tokens come from websquadesign.md, but the
+  UI leaves out these parts of it on purpose: no 4px left border on rounded
+  boxes (toasts, notices, cards), no pills or tinted badges, no uppercase
+  letter-spaced labels, no 16px radius (everything is 8px). Also no gradient
+  text and no blur behind bars or modals. The one decoration is `.aurora`:
+  two slow blurred glows behind the page (accent and info colour).
+- Accent: teal `#0f7d74` (hover `#0c655e`), not the indigo of
+  websquadesign.md. It is for the logo tile, the primary button, focus rings
+  and links. White text on it is 4.99:1; a lighter teal fails 4.5:1. The
+  favicon in ui.js carries the same colour by hand.
+- A status is an 8px dot before the text (`.notice`, `.toast`). Toasts are
+  inverted: `--text-primary` as background.
+- Events are rows of one list (`.event-list`) with hairlines between them,
+  not separate cards. The event type is a plain text line (`.ev-kind`);
+  booking details are plain "label value" pairs (`.chips`).
 - Two `wrangler dev` at once: give the second `--inspector-port 9230` and
   `--persist-to <dir>`, else it dies on port 9229 or a locked SQLite file.
 - Settings (targets, emoji, hotel all-day, default time/duration,

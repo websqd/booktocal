@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 // parser.js is a classic script (loaded by the browser via script-src 'self');
 // eval it here the same way and grab the global it defines.
 import { loadVendor } from './_load.mjs';
-const { parseBooking } = loadVendor().BTCParser;
+const { parseBooking, categoryIcon } = loadVendor().BTCParser;
 
 const NOW = new Date(2026, 7, 31); // Sun Aug 31 2026, fixed for determinism
 const DEF = { now: NOW };
@@ -143,6 +143,23 @@ check('category icons for shows, circus, water parks', () => {
   assert.equal(icon('Cirque du Soleil - 14 Sep 2026 20:00'), '🎪');
   assert.equal(icon('Aquaventure Water Park entry 15 Sep 2026 10:00'), '🌊');
   assert.equal(icon('Team sync 16 Sep 2026 10:00'), '📅');
+});
+
+// 8d. A call gets a phone, a contact gets an email, from the title only
+check('phone icon for "call", email icon for "contact"', () => {
+  const icon = (t) => parseBooking(t, DEF).events[0].icon;
+  assert.equal(icon('Call with Anna 16 Sep 2026 10:00'), '📞');
+  assert.equal(icon('Conference call 16 Sep 2026 10:00'), '📞');
+  assert.equal(icon('Contact the landlord 17 Sep 2026 09:00'), '📧');
+  assert.equal(icon('Team sync 16 Sep 2026 10:00\nQuestions? Call us or contact support.'), '📅');
+  assert.equal(icon('Recall briefing 16 Sep 2026 10:00'), '📅');
+});
+
+// 8e. The UI asks for the icon of a hand-made event
+check('categoryIcon(title, location) for blank events', () => {
+  assert.equal(categoryIcon('Call Anna', ''), '📞');
+  assert.equal(categoryIcon('Evening out', 'Royal Opera House'), '🎭');
+  assert.equal(categoryIcon('New event', ''), '📅');
 });
 
 // 9. Custom default time/duration

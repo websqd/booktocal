@@ -26,7 +26,7 @@ vanilla JS, no build step, no runtime dependencies.
 - **Readable events** — titles like `✈️ VN815: Ho Chi Minh City - Siem Reap`,
   `🚆 IR 1657: București Nord - Piatra Neamț`, `🏨 Koulen Hotel, Siem Reap`
   (emoji prefix is a checkbox, on by default; trains in Japan get 🚅, buses 🚌,
-  shows 🎭, circus 🎪, water parks 🌊 …). Descriptions list local departure and
+  shows 🎭, circus 🎪, water parks 🌊, a "call" 📞, a "contact" 📧 …). Descriptions list local departure and
   arrival times with their UTC offsets, duration, seat/coach/gate and booking
   reference.
 - **Right time everywhere** — departure and arrival are converted from their
@@ -199,6 +199,5 @@ data, public domain, via the `airports-json` dev dependency).
   a work account.
 - **Day ranges** without a clock time become one all-day event that covers
   every day of the range.
-- **Colour contrast**: Lighthouse accessibility is 95. The two open items are
-  the brand accent `#6366f1`: white button text on it (4.46:1) and the "To"
-  of the wordmark (4.18:1). Both come from `websquadesign.md`.
+- **Colour contrast**: the accent is teal `#0f7d74`, not the indigo of
+  `websquadesign.md`. White button text on it is 4.99:1.

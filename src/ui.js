@@ -15,7 +15,7 @@ export function appPage(nonce, payLink) {
 <title>BookToCal — bookings to calendar events</title>
 <meta name="description" content="Drop flight, train, hotel or ticket confirmations — PDFs, screenshots, emails or pasted text — and get Google / Apple / Outlook calendar events with the right local times. Everything is read in your browser.">
 <script nonce="${nonce}">try{var t=localStorage.getItem('btcTheme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236366f1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='3'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f7d74' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='4' width='18' height='18' rx='3'/%3E%3Cpath d='M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4'/%3E%3C/svg%3E">
 <style>${css()}</style>
 </head>
 <body>
@@ -26,10 +26,10 @@ export function appPage(nonce, payLink) {
     <span class="logo" aria-hidden="true">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M9 16l2 2 4-4"/></svg>
     </span>
-    <span class="wordmark">Book<em>To</em>Cal</span>
+    <span class="wordmark">BookToCal</span>
   </button>
   <div class="top-actions">
-    <span id="counter" class="counter">0/3 free</span>
+    <span id="counter" class="counter"></span>
     <button type="button" id="settings-btn" class="icon-btn" aria-label="Settings" title="Settings">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     </button>
@@ -42,17 +42,17 @@ export function appPage(nonce, payLink) {
 
 <main id="app">
   <div id="payment-banner" class="banner hidden">
-    <span class="banner-msg">Enjoying BookToCal? <strong>Unlock unlimited conversions</strong> with a one-time payment of $5 or more.</span>
-    <button type="button" id="pay-now-banner" class="btn small primary">Unlock &rarr;</button>
+    <span class="banner-msg">You have one free conversion left. A one-time payment of $5 or more removes the limit.</span>
+    <button type="button" id="pay-now-banner" class="btn small primary">Remove the limit</button>
     <button type="button" class="icon-btn banner-dismiss" id="banner-dismiss" aria-label="Dismiss">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
     </button>
   </div>
 
   <!-- Composer: pasted text and any number of files, converted together -->
-  <section id="compose" class="card hero-card">
-    <h1 class="headline-lg">Drop your bookings.<br><span class="grad">Get calendar events.</span></h1>
-    <p class="sub">Flights, trains, buses, hotels, show tickets, visas. Add as many confirmations as you like &mdash; each booking becomes its own event, in the local time of where it happens.</p>
+  <section id="compose" class="compose">
+    <h1 class="headline-lg">Turn booking confirmations into calendar events</h1>
+    <p class="sub">Flights, trains, buses, hotels, show tickets and visa deadlines. Add as many confirmations as you like. Each booking becomes its own event, in the local time of the place where it happens.</p>
 
     <div id="append-note" class="append-note hidden">
       <span id="append-text"></span>
@@ -70,7 +70,7 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           Add files
         </button>
-        <span class="composer-hint">PDFs, screenshots, emails (<span class="mono">.eml</span>), wallet passes &mdash; or drop them anywhere here</span>
+        <span class="composer-hint">PDF, screenshot, email (<span class="mono">.eml</span>) or wallet pass. You can also drop files on this box.</span>
       </div>
       <div class="drop-veil" aria-hidden="true">Drop to add</div>
     </div>
@@ -80,23 +80,16 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
       <label class="check-row inline"><input type="checkbox" id="emoji-compose" checked> <span>Add emojis to titles <span class="hint-inline">&#9992;&#65039; &#128646; &#127976;</span></span></label>
       <button type="button" id="convert-btn" class="btn primary big">
         <span id="convert-label">Convert to events</span>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
       </button>
     </div>
 
-    <p class="privacy-note">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      100% private: files are read and parsed in your browser. Nothing is uploaded.
-    </p>
+    <p class="privacy-note">Your files are read in your browser. Nothing is uploaded.</p>
   </section>
 
   <!-- Results -->
   <section id="results" class="hidden">
     <div class="results-toolbar">
-      <div>
-        <p class="overline">Your events</p>
-        <p id="results-meta" class="results-meta"></p>
-      </div>
+      <p id="results-meta" class="results-meta"></p>
       <div class="results-actions">
         <label class="check-row inline"><input type="checkbox" id="emoji-toggle" checked> <span>Emojis in titles</span></label>
         <button type="button" id="download-all" class="btn primary">
@@ -118,7 +111,7 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
   </section>
 </main>
 
-<footer class="foot">websqu.ad &middot; BookToCal &middot; privacy-first, in-browser parsing</footer>
+<footer class="foot">BookToCal by websqu.ad</footer>
 
 <!-- Settings slide-over -->
 <div id="overlay" class="overlay hidden"></div>
@@ -131,9 +124,9 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
   </div>
 
   <div class="settings-group">
-    <p class="overline">Calendar targets</p>
+    <h3 class="group-title">Calendar targets</h3>
     <p class="hint">Which buttons appear on each event.</p>
-    <label class="check-row"><input type="checkbox" data-target="google" checked> <span>Google Calendar <span class="tag">default</span></span></label>
+    <label class="check-row"><input type="checkbox" data-target="google" checked> <span>Google Calendar</span></label>
     <label class="check-row"><input type="checkbox" data-target="apple" checked> <span>Apple Calendar <span class="hint-inline">(.ics file)</span></span></label>
     <label class="check-row"><input type="checkbox" data-target="outlook"> <span>Outlook.com <span class="hint-inline">(personal)</span></span></label>
     <label class="check-row"><input type="checkbox" data-target="outlookWork"> <span>Outlook 365 <span class="hint-inline">(work or school)</span></span></label>
@@ -142,14 +135,14 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
   </div>
 
   <div class="settings-group">
-    <p class="overline">Event style</p>
+    <h3 class="group-title">Event style</h3>
     <label class="check-row"><input type="checkbox" id="set-emoji" checked> <span>Emojis in titles <span class="hint-inline">&#9992;&#65039; flights, &#128646; trains, &#127976; hotels&hellip;</span></span></label>
     <label class="check-row"><input type="checkbox" id="set-hotel-allday" checked> <span>Hotel stays as all-day banners</span></label>
     <p class="hint">Off: one timed block from check-in to check-out. Applies to the next conversion.</p>
   </div>
 
   <div class="settings-group">
-    <p class="overline">Missing details</p>
+    <h3 class="group-title">Missing details</h3>
     <p class="hint">Used when the source only gives one date, or no time at all.</p>
     <div class="field-row">
       <label for="set-time">Default start time</label>
@@ -159,7 +152,7 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
       <label for="set-duration">Default duration (minutes)</label>
       <input type="number" id="set-duration" class="input" min="5" max="720" step="5" value="30">
     </div>
-    <label class="check-row"><input type="checkbox" id="set-allday"> <span>No time in source &rarr; all-day event</span></label>
+    <label class="check-row"><input type="checkbox" id="set-allday"> <span>No time in the source: all-day event</span></label>
   </div>
 </aside>
 
@@ -168,7 +161,7 @@ Several bookings? Paste them one after another, separated by a line of ---"></te
   <div class="modal">
     <h2 id="gate-title" class="headline-sm">Free limit reached</h2>
     <p>You&rsquo;ve converted 3 times for free. A one-time payment of <strong>$5 or more</strong> unlocks unlimited conversions.</p>
-    <button type="button" id="pay-now-gate" class="btn primary big">Unlock unlimited &mdash; $5+</button>
+    <button type="button" id="pay-now-gate" class="btn primary big">Pay $5 or more</button>
     <p class="gate-alt">Already paid? <button type="button" id="show-code-entry" class="link-btn">Enter your unlock code</button></p>
     <div id="code-entry" class="code-entry hidden">
       <input type="text" id="code" class="input mono" placeholder="Unlock code" autocomplete="off" spellcheck="false" aria-label="Unlock code">
@@ -377,9 +370,9 @@ function atLimit(){ return GATE_ON && !activated && convertCount >= FREE_LIMIT; 
 function updateCounter(){
   var el = qs('#counter');
   if (!GATE_ON){ el.className = 'counter hidden'; return; }
-  if (activated){ el.className = 'counter unlimited'; el.textContent = '\\u221e'; return; }
+  if (activated){ el.className = 'counter'; el.textContent = 'Unlimited'; return; }
   el.className = 'counter' + (convertCount >= FREE_LIMIT - 1 ? ' low' : '');
-  el.textContent = convertCount + '/' + FREE_LIMIT + ' free';
+  el.textContent = Math.max(0, FREE_LIMIT - convertCount) + ' of ' + FREE_LIMIT + ' free left';
 }
 // Show the composer (or the gate when the free conversions are used up).
 function renderEntryView(){
@@ -470,7 +463,6 @@ document.addEventListener('keydown', function(e){
       activateLocal();
       toast('Unlocked!', 'success');
       var logo = qs('.logo');
-      logo.style.transition = 'box-shadow 0.3s ease';
       logo.style.boxShadow = '0 0 18px 2px var(--accent)';
       setTimeout(function(){ logo.style.boxShadow = ''; }, 1800);
     }
@@ -557,7 +549,7 @@ async function convertNow(){
   });
 
   if (!result.events.length){
-    toast(problems.length && problems[0].kind === 'danger' ? problems[0].text : 'No dates found \\u2014 nothing to add to a calendar', 'warning');
+    toast(problems.length && problems[0].kind === 'danger' ? problems[0].text : 'No dates found, so there is nothing to add to a calendar', 'warning');
     return;
   }
 
@@ -737,17 +729,17 @@ function chipsFor(ev){
   if (f.timeAssumed && !ev.allDay) warn('Time assumed', 'No time in the document: your default start time is used.');
   if (ev.confidence === 'low' && !f.timeAssumed) warn('Check details', 'This one was hard to read. Check the details before adding it.');
   (ev.notes || []).forEach(function(n){ if (/Another source/.test(n)) warn('Sources disagree', n); });
-  if (ev.sources && ev.sources.length) out.push('<li class="chip src" title="' + esc(ev.sources.join('\\n')) + '">' + esc(ev.sources.length === 1 ? ev.sources[0] : ev.sources.length + ' sources') + '</li>');
+  if (ev.sources && ev.sources.length) out.push('<li class="chip src" title="' + esc(ev.sources.join('\\n')) + '"><span class="chip-label">From</span> ' + esc(ev.sources.length === 1 ? ev.sources[0] : ev.sources.length + ' sources') + '</li>');
   return out.length ? '<ul class="chips">' + out.join('') + '</ul>' : '';
 }
 
 function eventCard(ev, i){
   var open = !!openEdits[ev.uid];
   var html = ''
-    + '<article class="event-card card type-' + esc(ev.type) + '" data-idx="' + i + '">'
+    + '<article class="event-card" data-idx="' + i + '">'
     + '<header class="ev-top">'
     + '<div class="ev-heading">'
-    + '<span class="badge type-' + esc(ev.type) + '">' + esc(TYPE_LABELS[ev.type] || 'Event') + '</span>'
+    + '<span class="ev-kind">' + esc(TYPE_LABELS[ev.type] || 'Event') + '</span>'
     + '<h2 class="ev-title" data-title>' + esc(BTCCal.titleOf(ev, settings)) + '</h2>'
     + '</div>'
     + '<div class="ev-tools">'
@@ -771,7 +763,7 @@ function eventCard(ev, i){
 // prefilled link can be shared.
 function cardButtons(){
   var defs = { google: 'Google', apple: 'Apple', outlook: 'Outlook', outlookWork: 'Outlook 365', yahoo: 'Yahoo', ics: '.ics file' };
-  var out = '<span class="field-label">Add to</span>';
+  var out = '<span class="actions-label">Add to</span>';
   var any = false;
   for (var t in defs){
     if (!settings.targets[t]) continue;
@@ -783,7 +775,7 @@ function cardButtons(){
         + '</button>';
     }
   }
-  if (!any) out += '<span class="muted">No calendar targets selected \\u2014 pick some in Settings.</span>';
+  if (!any) out += '<span class="muted">No calendar targets selected. Pick some in Settings.</span>';
   return out;
 }
 
@@ -812,7 +804,7 @@ function editForm(ev){
     + '<label class="check-row allday-row"><input type="checkbox" data-field="allDay" ' + (ev.allDay ? 'checked' : '') + '> <span>All-day event</span></label>'
     + '<p class="hint tz-hint">' + (ev.allDay ? 'All-day events have no timezone.'
       : zones ? 'Times are local to ' + esc(zones) + ' and convert to your calendar\\u2019s timezone automatically.'
-        : 'No timezone detected \\u2014 times are added as-is in your calendar\\u2019s timezone.') + '</p>'
+        : 'No timezone detected. Times are added as-is in your calendar\\u2019s timezone.') + '</p>'
     + '</div>';
   return html;
 }
@@ -845,21 +837,23 @@ qs('#event-list').addEventListener('click', function(e){
     exportEvent(btn.getAttribute('data-target-name'), c.ev);
   } else if (act === 'copy'){
     navigator.clipboard.writeText(BTCCal.googleUrl(c.ev, settings)).then(
-      function(){ toast('Google Calendar link copied \\u2014 paste it anywhere', 'success'); },
+      function(){ toast('Google Calendar link copied', 'success'); },
       function(){ toast('Clipboard access denied', 'danger'); }
     );
   }
 });
 
 // Typing in the title updates the heading live; other fields re-render the
-// card once the value is committed.
+// card once the value is committed. A blank event has no source text, so its
+// icon comes from what is typed.
 qs('#event-list').addEventListener('input', function(e){
   var inp = e.target.closest('[data-field="title"], [data-field="location"]');
   if (!inp) return;
   var c = cardEvent(inp);
   if (!c || !c.ev) return;
   c.ev[inp.getAttribute('data-field')] = inp.value;
-  if (inp.getAttribute('data-field') === 'title') c.card.querySelector('[data-title]').textContent = BTCCal.titleOf(c.ev, settings);
+  if (c.ev.blank) c.ev.icon = BTCParser.categoryIcon(c.ev.title, c.ev.location);
+  if (c.ev.blank || inp.getAttribute('data-field') === 'title') c.card.querySelector('[data-title]').textContent = BTCCal.titleOf(c.ev, settings);
 });
 qs('#event-list').addEventListener('change', function(e){
   var inp = e.target.closest('[data-field]');
@@ -987,7 +981,7 @@ function exportEvent(target, ev){
   if (target === 'yahoo'){ window.open(BTCCal.yahooUrl(ev, settings), '_blank', 'noopener'); return; }
   // apple + ics both download .ics (Apple Calendar has no web prefill URL).
   BTCCal.downloadIcs([ev], settings, slug(ev.title) + '.ics');
-  toast('.ics downloaded \\u2014 open it to add the event', 'success');
+  toast('.ics downloaded. Open it to add the event.', 'success');
 }
 
 function slug(s){
@@ -998,7 +992,7 @@ qs('#download-all').addEventListener('click', function(){
   if (!currentEvents.length){ toast('No events to export', 'warning'); return; }
   var name = currentEvents.length === 1 ? slug(currentEvents[0].title) : 'booktocal-' + currentEvents.length + '-events';
   BTCCal.downloadIcs(currentEvents, settings, name + '.ics');
-  toast('.ics downloaded \\u2014 open it to import ' + (currentEvents.length === 1 ? 'the event' : 'all ' + currentEvents.length + ' events'), 'success');
+  toast('.ics downloaded. Open it to import ' + (currentEvents.length === 1 ? 'the event' : 'all ' + currentEvents.length + ' events') + '.', 'success');
 });
 
 qs('#add-event').addEventListener('click', function(){
@@ -1006,7 +1000,7 @@ qs('#add-event').addEventListener('click', function(){
   var localTz = null;
   try { localTz = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e){}
   var ev = {
-    uid: nextId++, type: 'event', icon: '\\ud83d\\udcc5', title: 'New event', location: '',
+    uid: nextId++, blank: true, type: 'event', icon: '\\ud83d\\udcc5', title: 'New event', location: '',
     tz: localTz, tzEnd: localTz, allDay: false,
     start: { date: today, time: settings.defaultTime },
     end: { date: today, time: plusMinutes(settings.defaultTime, settings.defaultDuration) },
@@ -1049,16 +1043,17 @@ function css() {
   --border-subtle: rgba(255,255,255,0.03);
   --border-default: rgba(255,255,255,0.05);
   --border-strong: rgba(255,255,255,0.1);
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
+  --accent: #0f7d74;
+  --accent-hover: #0c655e;
   --success: #22c55e;
   --danger: #ef4444;
   --warning: #f59e0b;
   --info: #3b82f6;
-  --shadow-1: 0 1px 2px 0 rgba(0,0,0,0.05);
   --shadow-2: 0 4px 6px -1px rgba(0,0,0,0.1);
   --shadow-3: 0 10px 15px -3px rgba(0,0,0,0.1);
-  --topbar-bg: rgba(18,18,20,0.75);
+  /* Coloured text: the colour mixed with the text colour, so it stays readable in both themes. */
+  --link: color-mix(in srgb, var(--accent) 60%, var(--text-primary));
+  --warn-text: color-mix(in srgb, var(--warning) 55%, var(--text-primary));
 }
 [data-theme="light"] {
   --bg-base: #f8fafc;
@@ -1072,7 +1067,6 @@ function css() {
   --border-subtle: #f1f5f9;
   --border-default: #e2e8f0;
   --border-strong: #cbd5e1;
-  --topbar-bg: rgba(248,250,252,0.8);
 }
 
 * { box-sizing: border-box; }
@@ -1090,13 +1084,11 @@ body {
 .mono { font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px; }
 .muted { color: var(--text-secondary); }
 
-/* ambient backdrop: two slow-drifting accent glows */
-.aurora {
-  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
-}
+/* ambient backdrop: two slow-drifting glows */
+.aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
 .aurora::before, .aurora::after {
   content: ""; position: absolute; width: 55vmax; height: 55vmax; border-radius: 50%;
-  filter: blur(90px); opacity: 0.16;
+  filter: blur(90px); opacity: 0.2;
 }
 .aurora::before {
   background: var(--accent); top: -25vmax; left: -12vmax;
@@ -1110,44 +1102,36 @@ body {
 @keyframes drift1 { to { transform: translate(9vmax, 7vmax) scale(1.12); } }
 @keyframes drift2 { to { transform: translate(-8vmax, -6vmax) scale(0.94); } }
 @media (prefers-reduced-motion: reduce) {
-  .aurora::before, .aurora::after, .spinner { animation: none; }
+  .aurora::before, .aurora::after, .spinner, .slideover, .modal, .toast { animation: none; }
   html { scroll-behavior: auto; }
 }
 
 /* --- top bar -------------------------------------------------------------- */
 .topbar {
-  position: sticky; top: 0; z-index: 50;
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 8px; padding: 12px 32px;
-  background: var(--topbar-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border-default);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  max-width: 760px; margin: 0 auto; padding: 16px 32px 0;
 }
 .brand {
   display: inline-flex; align-items: center; gap: 10px;
-  background: none; border: 0; padding: 4px; cursor: pointer;
+  background: none; border: 0; padding: 4px; margin-left: -4px; cursor: pointer;
   color: var(--text-primary); font: inherit; border-radius: 8px;
   min-height: 44px;
 }
 .logo {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 34px; height: 34px; border-radius: 10px;
+  width: 34px; height: 34px; border-radius: 8px;
   background: var(--accent); color: #ffffff;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 45%, transparent);
+  transition: box-shadow 250ms ease-out;
 }
-.wordmark { font-size: 18px; font-weight: 600; letter-spacing: -0.02em; }
-.wordmark em { font-style: normal; color: var(--accent); }
-.top-actions { display: flex; align-items: center; gap: 8px; }
+.wordmark { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+/* The icons sit 12px inside their 44px buttons: pull the row out to the column edge. */
+.top-actions { display: flex; align-items: center; gap: 8px; margin-right: -12px; }
 
 .counter {
-  display: inline-block; margin-right: 4px; font-size: 12px; font-weight: 500;
-  padding: 3px 10px; border-radius: 9999px;
-  background: var(--surface-hover); color: var(--text-secondary);
-  border: 1px solid var(--border-default); white-space: nowrap;
+  margin-right: 8px; font-size: 13px; color: var(--text-secondary);
+  white-space: nowrap; font-variant-numeric: tabular-nums;
 }
-.counter.low { background: color-mix(in srgb, var(--warning) 14%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); border-color: transparent; }
-.counter.unlimited { background: color-mix(in srgb, var(--success) 14%, transparent); color: var(--success); border-color: transparent; font-size: 15px; }
+.counter.low { color: var(--warn-text); }
 
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -1155,33 +1139,18 @@ body {
   background: transparent; border: 1px solid transparent; color: var(--text-secondary);
   cursor: pointer; transition: background 150ms ease-out, color 150ms ease-out;
 }
-.icon-btn:hover { background: var(--surface-hover); color: var(--text-primary); }
-.icon-btn[aria-expanded="true"] { background: var(--surface-hover); color: var(--accent); }
+.icon-btn:hover, .icon-btn[aria-expanded="true"] { background: var(--surface-hover); color: var(--text-primary); }
 
 [data-theme="dark"] .icon-sun, [data-theme="light"] .icon-moon { display: none; }
 
 /* --- layout --------------------------------------------------------------- */
 main {
-  max-width: 880px; margin: 0 auto; padding: 48px 32px 96px;
+  max-width: 760px; margin: 0 auto; padding: 40px 32px 96px;
 }
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border-default);
-  border-radius: 16px;
-}
-.hero-card { padding: 48px; }
 .headline-lg { font-size: 32px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.15; margin: 0 0 12px; text-wrap: balance; }
 .headline-sm { font-size: 20px; font-weight: 600; letter-spacing: -0.025em; margin: 0 0 12px; }
-.grad {
-  background: linear-gradient(92deg, var(--accent), var(--info));
-  -webkit-background-clip: text; background-clip: text;
-  -webkit-text-fill-color: transparent; color: transparent;
-}
-.sub { color: var(--text-secondary); margin: 0 0 32px; max-width: 60ch; }
-.overline {
-  font-size: 12px; font-weight: 600; letter-spacing: 0.05em;
-  text-transform: uppercase; color: var(--text-secondary); margin: 0 0 4px;
-}
+.sub { color: var(--text-secondary); margin: 0 0 32px; max-width: 58ch; }
+.group-title { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
 .hint { font-size: 13px; color: var(--text-secondary); margin: 0 0 12px; }
 .hint-inline { font-size: 12px; color: var(--text-secondary); }
 
@@ -1198,15 +1167,15 @@ main {
 
 /* --- composer --------------------------------------------------------------- */
 .composer {
-  position: relative; border-radius: 16px;
-  border: 1.5px dashed var(--border-strong);
-  background: var(--surface-input);
-  transition: border-color 150ms ease-out, background 150ms ease-out;
+  position: relative; border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  transition: border-color 150ms ease-out;
 }
-.composer:focus-within { border-color: var(--accent); border-style: solid; }
-.composer.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.composer.over { border-color: var(--accent); border-style: dashed; }
 .composer textarea.input {
-  display: block; border: 0; background: transparent; border-radius: 16px 16px 0 0;
+  display: block; border: 0; background: transparent; border-radius: 8px 8px 0 0;
   resize: vertical; min-height: 168px; line-height: 1.6; padding: 16px;
   font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 13px;
 }
@@ -1218,127 +1187,106 @@ main {
 .composer-hint { font-size: 13px; color: var(--text-secondary); flex: 1 1 220px; }
 .drop-veil {
   position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
-  border-radius: 16px; font-weight: 600; color: var(--accent); pointer-events: none;
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border-radius: 8px; font-weight: 600; color: var(--link); pointer-events: none;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
 }
 .composer.over .drop-veil { display: flex; }
 
 .file-list {
-  list-style: none; margin: 0; padding: 4px 16px 12px;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px;
+  list-style: none; margin: 0; padding: 0 16px;
   max-height: 248px; overflow-y: auto;
 }
 .file-chip {
-  display: flex; align-items: center; gap: 10px; min-width: 0;
-  padding: 4px 4px 4px 12px; border-radius: 8px;
-  background: var(--surface); border: 1px solid var(--border-default);
+  display: flex; align-items: center; gap: 12px; min-width: 0;
+  border-top: 1px solid var(--border-default);
 }
-.file-kind {
-  flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
-  padding: 2px 8px; border-radius: 9999px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent);
-}
+.file-kind { flex: none; width: 76px; font-size: 13px; color: var(--text-secondary); }
 .file-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
-.file-note { flex: none; font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
-.file-chip.error { border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
-.file-chip.error .file-note { color: var(--danger); }
-.file-remove { width: 36px; height: 36px; }
+.file-note { flex: none; font-size: 13px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.file-chip.error .file-note { color: color-mix(in srgb, var(--danger) 70%, var(--text-primary)); }
+.file-remove { margin-right: -12px; }
 .spinner {
-  flex: none; width: 16px; height: 16px; margin: 10px; border-radius: 50%;
+  flex: none; width: 16px; height: 16px; margin: 14px 2px; border-radius: 50%;
   border: 2px solid var(--border-strong); border-top-color: var(--accent);
   animation: spin 800ms linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .append-note {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  margin: -8px 0 16px; padding: 10px 14px; border-radius: 8px; font-size: 14px;
-  background: color-mix(in srgb, var(--info) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--info) 30%, transparent);
+  display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap;
+  margin: -16px 0 16px; font-size: 14px; color: var(--text-secondary);
 }
 .compose-actions {
   display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  margin-top: 20px;
+  margin-top: 16px;
 }
-.privacy-note {
-  display: flex; align-items: center; gap: 6px;
-  margin: 24px 0 0; font-size: 13px; color: var(--text-secondary);
-}
+.privacy-note { margin: 24px 0 0; font-size: 13px; color: var(--text-secondary); }
 
 /* --- buttons ---------------------------------------------------------------- */
 .btn {
   display: inline-flex; align-items: center; gap: 8px; justify-content: center;
   border-radius: 8px; border: 1px solid transparent;
   font: inherit; font-weight: 500; padding: 10px 18px; min-height: 44px;
-  cursor: pointer; transition: background 150ms ease-out, border-color 150ms ease-out, transform 150ms ease-out;
+  cursor: pointer; transition: background 150ms ease-out, border-color 150ms ease-out;
 }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .btn.primary { background: var(--accent); color: #ffffff; }
-.btn.primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btn.primary:hover { background: var(--accent-hover); }
 .btn.secondary {
   background: var(--surface); border-color: var(--border-strong); color: var(--text-primary);
 }
 .btn.secondary:hover { background: var(--surface-hover); }
 .btn.big { padding: 12px 24px; font-size: 16px; }
 .btn.small { padding: 6px 12px; min-height: 36px; font-size: 13px; }
-.btn:disabled { background: var(--surface-hover); color: var(--text-muted); border-color: transparent; cursor: not-allowed; transform: none; }
+.btn:disabled { background: var(--surface-hover); color: var(--text-muted); border-color: transparent; cursor: not-allowed; }
 .link-btn {
-  background: none; border: 0; padding: 0; font: inherit; color: var(--accent);
-  cursor: pointer; text-decoration: underline;
+  background: none; border: 0; padding: 0; font: inherit; color: var(--link);
+  cursor: pointer; text-decoration: underline; text-underline-offset: 2px;
 }
-.link-btn:hover { color: var(--accent-hover); }
+.link-btn:hover { color: var(--text-primary); }
 
 /* --- banner ------------------------------------------------------------------ */
 .banner {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  background: color-mix(in srgb, var(--info) 10%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--info) 35%, transparent);
-  border-left: 4px solid var(--info);
-  border-radius: 12px; padding: 12px 16px; margin-bottom: 24px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 8px 8px 8px 16px; margin-bottom: 32px;
 }
-.banner-msg { flex: 1 1 auto; color: var(--text-primary); font-size: 14px; }
+.banner-msg { flex: 1 1 240px; font-size: 14px; }
 .banner-dismiss { width: 36px; height: 36px; }
 
 /* --- results ------------------------------------------------------------------ */
 .results-toolbar {
-  display: flex; align-items: flex-end; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   gap: 12px 24px; flex-wrap: wrap; margin-bottom: 16px;
 }
-.results-meta { margin: 0; color: var(--text-primary); font-size: 20px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.results-meta { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .results-actions { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
-.results-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 24px; }
-.notices { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.notice {
-  margin: 0; padding: 10px 14px; border-radius: 8px; font-size: 14px;
-  background: var(--surface); border: 1px solid var(--border-default); border-left: 4px solid var(--warning);
-  overflow-wrap: anywhere;
-}
-.notice.danger { border-left-color: var(--danger); }
+.results-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 
-.event-list { display: flex; flex-direction: column; gap: 12px; }
-.event-card { padding: 20px; border-left: 4px solid var(--accent); }
-.event-card.type-flight { border-left-color: var(--info); }
-.event-card.type-hotel { border-left-color: var(--success); }
-.event-card.type-train, .event-card.type-bus, .event-card.type-ferry { border-left-color: var(--warning); }
-.event-card.type-deadline { border-left-color: var(--danger); }
+/* A status is a small dot before the text, here and in toasts. */
+.notices { display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; }
+.notice { position: relative; margin: 0; padding-left: 16px; font-size: 14px; overflow-wrap: anywhere; }
+.notice::before {
+  content: ""; position: absolute; left: 0; top: 0.55em;
+  width: 8px; height: 8px; border-radius: 50%; background: var(--warning);
+}
+.notice.danger::before { background: var(--danger); }
+
+/* One list, one row per event, hairlines between the rows. */
+.event-list {
+  background: var(--surface); border: 1px solid var(--border-default); border-radius: 8px;
+}
+.event-card { padding: 24px; }
+.event-card + .event-card { border-top: 1px solid var(--border-default); }
 .ev-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .ev-heading { min-width: 0; }
+.ev-kind { display: block; font-size: 13px; color: var(--text-secondary); }
 .ev-title {
-  margin: 6px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.25;
+  margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.3;
   overflow-wrap: anywhere;
 }
-.ev-tools { display: flex; gap: 2px; margin: -8px -8px 0 0; }
-.ev-del:hover { color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, transparent); }
-/* Badge and chip text: the type colour mixed with the text colour, so it stays readable on its tint. */
-.badge {
-  display: inline-block; font-size: 12px; font-weight: 500; padding: 2px 8px;
-  border-radius: 9999px; white-space: nowrap;
-}
-.badge.type-flight { background: color-mix(in srgb, var(--info) 13%, transparent); color: color-mix(in srgb, var(--info) 55%, var(--text-primary)); }
-.badge.type-hotel { background: color-mix(in srgb, var(--success) 13%, transparent); color: color-mix(in srgb, var(--success) 55%, var(--text-primary)); }
-.badge.type-train, .badge.type-bus, .badge.type-ferry { background: color-mix(in srgb, var(--warning) 15%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); }
-.badge.type-deadline { background: color-mix(in srgb, var(--danger) 12%, transparent); color: color-mix(in srgb, var(--danger) 55%, var(--text-primary)); }
-.badge.type-event { background: color-mix(in srgb, var(--accent) 13%, transparent); color: color-mix(in srgb, var(--accent) 55%, var(--text-primary)); }
+.ev-tools { display: flex; gap: 2px; margin: -10px -12px 0 0; }
+.ev-del:hover { color: color-mix(in srgb, var(--danger) 70%, var(--text-primary)); }
 
 .ev-when { margin-top: 16px; }
 .when-line { margin: 0; font-size: 16px; font-variant-numeric: tabular-nums; }
@@ -1353,39 +1301,33 @@ main {
 .leg-time.approx { color: var(--text-secondary); }
 .leg-place { font-size: 14px; overflow-wrap: anywhere; }
 .leg-place .code {
-  font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; color: color-mix(in srgb, var(--text-secondary) 75%, var(--text-primary));
-  padding: 1px 6px; border-radius: 4px; background: var(--surface-hover); white-space: nowrap;
+  font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 12px;
+  color: var(--text-secondary); white-space: nowrap;
 }
 .leg-date { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .leg-mid { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); }
 .leg-rule { flex: 1 1 16px; height: 1px; background: var(--border-strong); }
 .leg-dur { font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 
-.chips { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-.chip {
-  font-size: 12px; padding: 2px 8px; border-radius: 9999px; max-width: 100%;
-  background: var(--surface-hover); color: var(--text-primary);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.chip-label { color: color-mix(in srgb, var(--text-secondary) 75%, var(--text-primary)); }
-.chip.warn { background: color-mix(in srgb, var(--warning) 14%, transparent); color: color-mix(in srgb, var(--warning) 55%, var(--text-primary)); cursor: help; }
-.chip.src { background: transparent; border: 1px solid var(--border-default); color: var(--text-secondary); max-width: 240px; }
+/* Booking details as plain "label value" pairs. */
+.chips { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 13px; }
+.chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-label { color: var(--text-secondary); }
+.chip.warn { color: var(--warn-text); cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+.chip.src { max-width: 280px; }
 
-.event-actions {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-default);
-}
-.field-label { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-secondary); }
-.event-actions .field-label { margin-right: 4px; }
+.event-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+.actions-label { font-size: 14px; color: var(--text-secondary); margin-right: 4px; }
 .event-actions .btn.icon-only { padding: 10px; width: 44px; }
 
-.ev-edit { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-default); }
+.ev-edit { margin-top: 20px; padding: 16px; border-radius: 8px; background: var(--surface-hover); }
 .event-grid {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
 }
 .event-grid label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .event-grid .span2 { grid-column: span 2; }
 .event-grid .input { padding: 9px 12px; }
+.field-label { font-size: 13px; font-weight: 500; color: var(--text-secondary); }
 .allday-row { margin-top: 8px; }
 .tz-hint { margin: 0; overflow-wrap: anywhere; }
 
@@ -1407,10 +1349,6 @@ main {
 }
 .check-row.inline { padding: 0; font-size: 14px; color: var(--text-secondary); }
 .check-row input { accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
-.tag {
-  font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 9999px;
-  background: color-mix(in srgb, var(--accent) 14%, transparent); color: color-mix(in srgb, var(--accent) 55%, var(--text-primary));
-}
 .field-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
 .field-row label { color: var(--text-secondary); font-size: 14px; }
 .field-row .input { width: 130px; text-align: right; }
@@ -1420,52 +1358,53 @@ input[type="time"].input, input[type="number"].input { padding: 8px 10px; }
 .modal-wrap {
   position: fixed; inset: 0; z-index: 110;
   display: flex; align-items: center; justify-content: center; padding: 16px;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.5);
 }
 .modal {
-  width: 100%; max-width: 400px; text-align: center;
+  width: 100%; max-width: 400px;
   background: var(--surface-raised); border: 1px solid var(--border-default);
-  border-radius: 16px; box-shadow: var(--shadow-3); padding: 32px;
-  animation: pop 250ms ease-out;
+  border-radius: 8px; box-shadow: var(--shadow-3); padding: 24px;
+  animation: fade-in 250ms ease-out;
 }
-@keyframes pop { from { transform: scale(0.96); opacity: 0; } to { transform: none; opacity: 1; } }
-.modal p { color: var(--text-secondary); }
-.modal .btn.big { width: 100%; margin-top: 8px; }
-.gate-alt { font-size: 14px; margin: 16px 0 0; }
-.code-entry { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
-.code-error { color: var(--danger); font-size: 13px; min-height: 1em; margin: 0; }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.modal p { color: var(--text-secondary); margin: 0 0 16px; }
+.modal .btn.big { width: 100%; }
+.modal .gate-alt { font-size: 14px; margin: 16px 0 0; }
+.code-entry { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.modal .code-error { color: color-mix(in srgb, var(--danger) 70%, var(--text-primary)); font-size: 13px; min-height: 1em; margin: 0; }
 
 /* --- toasts ---------------------------------------------------------------------- */
 .toasts {
   position: fixed; right: 16px; bottom: 16px; left: 16px; z-index: 120;
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none;
 }
+/* Inverted: the text colour as the background, in both themes. */
 .toast {
   max-width: min(420px, 100%);
-  background: var(--surface-raised); border: 1px solid var(--border-default);
-  border-left: 4px solid var(--info);
+  background: var(--text-primary); color: var(--bg-base);
   border-radius: 8px; box-shadow: var(--shadow-2);
-  padding: 10px 16px; font-size: 14px; color: var(--text-primary); overflow-wrap: anywhere;
-  animation: toast-in 250ms ease-out; transition: opacity 300ms ease-in, transform 300ms ease-in;
+  padding: 10px 14px; font-size: 14px; overflow-wrap: anywhere;
+  animation: toast-in 250ms ease-out; transition: opacity 300ms ease-in;
 }
-.toast.success { border-left-color: var(--success); }
-.toast.danger { border-left-color: var(--danger); }
-.toast.warning { border-left-color: var(--warning); }
-.toast.out { opacity: 0; transform: translateY(6px); }
+.toast.danger::before, .toast.warning::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  margin-right: 8px; background: var(--danger);
+}
+.toast.warning::before { background: var(--warning); }
+.toast.out { opacity: 0; }
 @keyframes toast-in { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* --- footer ----------------------------------------------------------------------- */
 .foot {
-  max-width: 880px; margin: 0 auto; padding: 24px 32px 48px;
+  max-width: 760px; margin: 0 auto; padding: 0 32px 48px;
   color: var(--text-secondary); font-size: 13px;
 }
 
 /* --- responsive -------------------------------------------------------------------- */
 @media (max-width: 640px) {
-  .topbar { padding: 10px 16px; }
+  .topbar { padding: 8px 16px 0; }
   main { padding: 24px 16px 64px; }
-  .foot { padding: 24px 16px 48px; }
-  .hero-card { padding: 24px 16px; }
+  .foot { padding: 0 16px 48px; }
   .headline-lg { font-size: 26px; }
   .sub { margin-bottom: 24px; }
   .compose-actions { flex-direction: column; align-items: stretch; }
@@ -1480,6 +1419,8 @@ input[type="time"].input, input[type="number"].input { padding: 8px 10px; }
   .leg-mid .leg-rule:last-child { display: none; }
   .results-actions { width: 100%; justify-content: space-between; }
   .results-foot .btn { flex: 1 1 auto; }
+  .actions-label { flex: 0 0 100%; }
+  .event-actions .btn { padding: 10px 14px; }
 }
 
 /* iOS Safari zooms the whole page when a focused field has text under 16px. */

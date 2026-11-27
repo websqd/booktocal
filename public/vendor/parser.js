@@ -1428,7 +1428,14 @@ var BTCParser = (function () {
     [/\b(?:doctor|dentist|clinic|appointment|hospital)\b/i, '🩺'],
     [/\b(?:conference|summit|meetup|workshop|webinar|seminar)\b/i, '🎤'],
   ];
-  function categoryIcon(text) {
+  // Matched on the title alone ("Call us" and "Contact us" are in most footers), and first.
+  const TITLE_CATEGORIES = [
+    [/\bcalls?\b/i, '📞'],
+    [/\bcontact\b/i, '📧'],
+  ];
+  function categoryIcon(title, context) {
+    for (const [re, icon] of TITLE_CATEGORIES) if (re.test(title)) return icon;
+    const text = title + ' ' + context;
     for (const [re, icon] of CATEGORIES) if (re.test(text)) return icon;
     return '📅';
   }
@@ -1464,7 +1471,7 @@ var BTCParser = (function () {
       const around = L.slice(Math.max(0, i - 3), Math.min(L.length, i + 4)).map((x) => x.text).join(' ');
       events.push(mkEvent({
         type: 'event',
-        icon: categoryIcon(title + ' ' + location + ' ' + around),
+        icon: categoryIcon(title, location + ' ' + around),
         title: title,
         location: location,
         tz: G.tzFromText(line.text + ' ' + location),
@@ -1739,5 +1746,5 @@ var BTCParser = (function () {
     }
   }
 
-  return { parseBooking: parseBooking, parseDocuments: parseDocuments };
+  return { parseBooking: parseBooking, parseDocuments: parseDocuments, categoryIcon: categoryIcon };
 })();
