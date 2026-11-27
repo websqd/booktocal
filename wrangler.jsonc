@@ -1,7 +1,7 @@
 {
 	// Cloudflare Worker config — https://developers.cloudflare.com/workers/wrangler/configuration/
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "bookingtocal",
+	"name": "booktocal",
 	"main": "src/index.js",
 	"compatibility_date": "2026-06-01",
 	// Static assets (vendored pdf.js). Everything else is served by the Worker so
